@@ -1,0 +1,591 @@
+\section{}
+
+\textbf{Tiempo de lectura:} \{s06-reading-time\}
+
+Un sistema operativo proporciona un entorno controlado para la ejecución
+de programas. Dicho entorno debe proporcionar ciertos servicios que
+pueden ser accedidos por los programas a través de una \textbf{interfaz
+de programación de aplicaciones} o \textbf{{}API} (\emph{Application
+Programming Interface}).
+
+\section{Interfaces de programación de
+aplicaciones}\label{_interfaces_de_programaciuxf3n_de_aplicaciones}
+
+{} Algunas de las API disponibles para los desarrolladores de
+aplicaciones son Windows API y POSIX.
+
+\subsection{\texorpdfstring{{}Windows
+API}{Windows API}}\label{_windows_apiwindows_api}
+
+\{windows\_api\} es el nombre que recibe la \textbf{interfaz de
+programación de aplicaciones} de Microsoft Windows, con la que
+prácticamente tienen que interactuar todas las aplicaciones, de una
+forma u otra.
+
+Antiguamente se denominaba Win32 API, pero Microsoft ha querido
+aglutinar bajo una misma denominación las distintas versiones de la API
+de Windows que han existido, como Win16 ---usada en las versiones de 16
+bits de Windows--- o Win64 ---que es la variante de Win32 adaptada a
+arquitecturas de 64 bits---.
+
+Está compuesta por funciones en C almacenadas, principalmente, en las
+librerías de enlace dinámico (\{dll\}): \texttt{kernel32.dll},
+\texttt{user32.dll} y \texttt{gdi32.dll}. Aunque según se ha ido
+ampliando la API, se han incorporado otras librerías adicionales.
+
+Provee un conjunto muy amplio de servicios: E/S a archivos y
+dispositivos, gestión de procesos, hilos y memoria, manejo de errores,
+registro de Windows, interfaz a dispositivos gráficos ---pantallas e
+impresoras--- gestión de ventanas, comunicaciones en red, etc.
+
+\subsection{\texorpdfstring{{}POSIX}{POSIX}}\label{_posixposix}
+
+\{posix\} (\emph{Portable Operating System Interface for Unix}) es el
+nombre de una familia de estándares que definen una \textbf{interfaz de
+programación de aplicaciones} para sistemas operativos. Esto permite que
+un mismo programa pueda ser ejecutado en distintos sistemas operativos,
+siempre que sean compatibles con POSIX.
+
+El lenguaje C fue diseñado originalmente para implementar sistemas UNIX
+y por eso la librería estándar de C tenía mucho parecido con la librería
+del sistema de UNIX. Con el tiempo, al ir añadiendo más funcionalidades,
+la librería del sistema de los sistemas UNIX de los distintos
+fabricantes fue divergiendo, haciendo muy complicado desarrollar
+programas que usasen las características más avanzadas y que a la vez
+pudieran ejecutarse en varios de ellos. Por eso el \{ieee\} desarrolló
+el estándar POSIX, que define una API común para todos los UNIX y
+sistemas estilo UNIX modernos ---como es el caso de GNU/Linux---. Así
+que la práctica totalidad de estos sistemas son compatible POSIX.
+
+Por su origen, la API POSIX es un superconjunto de la API de la librería
+estándar de C. Por eso en los sistemas POSIX, la librería estándar de C
+es parte de la librería del sistema, en lugar de dos librerías
+separadas.
+
+Las funciones POSIX están almacenadas, principalmente, en la librería
+\texttt{libc}. Aunque algunas características pueden estar en otras
+librerías, como \texttt{libm} ---la librería matemática--- o
+\texttt{libpthread} ---la librería de hilos---.
+
+Los desarrolladores del sistema a veces añaden funciones no incluidas en
+el estándar POSIX, con el objeto de soportar algún tipo de funcionalidad
+avanzada del sistema. Este es el caso de las diferentes versiones de BSD
+y la librería del sistema del proyecto GNU ---usada generalmente en los
+sistemas Linux--- que incluye sus propias extensiones. Además, el
+estándar POSIX ha tenido varias revisiones desde la primera ---publicada
+en 1988--- cada una de las cuales añade características y
+funcionalidades adicionales.
+
+Antes de usar extensiones y características avanzadas debemos tener
+presente que:
+
+\begin{itemize}
+\item
+  Un programa que solo utilice funcionalidades hasta cierta versión de
+  la API POSIX, podrá ejecutarse en cualquier sistema operativo
+  compatible POSIX que implemente al menos hasta esa versión del
+  estándar.
+\item
+  Mientras que uno que utilice, por ejemplo, alguna funcionalidad
+  adicional no POSIX de GNU/Linux o macOS, solo podrá compilarse y
+  ejecutarse en GNU/Linux o en macOS, según el caso.
+\end{itemize}
+
+Como la compatibilidad con diferentes sistemas puede ser algo bastante
+complejo de gestionar para los desarrolladores, los sistemas POSIX
+ofrecen macros con las que controlar qué funcionalidades del sistema
+están disponibles para nuestro programa. A estas macros sé las denomina
+\{linux\_feature\_test\_macros\}.
+
+Por ejemplo, el siguiente programa en C ---disponible en
+\{softstack\_c\}--- realiza una serie de tareas muy sencillas: crea un
+archivo, muestra una serie de mensajes por la salida estándar, cierra el
+archivo y termina. Sin embargo, si no se define la macro
+\texttt{\_POSIX\_C\_SOURCE} puede que no compile, según la versión de la
+librería del sistema y las opciones del compilador. El motivo es que
+todas las funciones utilizadas en el programa forman parte del estándar
+POSIX desde hace tiempo, excepto \{linux\_mkstemp\}, que es una función
+introducida en el estándar POSIX.1-2008. Por lo que si el compilador por
+defecto compila para una versión anterior del estándar, esta y otras
+funciones definidas en especificaciones posteriores no están.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\PreprocessorTok{\#define \_POSIX\_C\_SOURCE }\DecValTok{200809}\BuiltInTok{L}\PreprocessorTok{                      }
+
+\PreprocessorTok{\#include }\ImportTok{\textless{}fcntl.h\textgreater{}}
+\PreprocessorTok{\#include }\ImportTok{\textless{}unistd.h\textgreater{}}
+\PreprocessorTok{\#include }\ImportTok{\textless{}sys/types.h\textgreater{}}
+\PreprocessorTok{\#include }\ImportTok{\textless{}sys/stat.h\textgreater{}}
+
+\PreprocessorTok{\#include }\ImportTok{\textless{}stdio.h\textgreater{}}
+\PreprocessorTok{\#include }\ImportTok{\textless{}stdlib.h\textgreater{}}
+
+\DataTypeTok{int}\NormalTok{ main}\OperatorTok{()}
+\OperatorTok{\{}
+    \DataTypeTok{char}\NormalTok{ filename}\OperatorTok{[]} \OperatorTok{=} \StringTok{"/tmp/softstack{-}fileXXXXXX"}\OperatorTok{;}
+
+\NormalTok{    mkstemp}\OperatorTok{(}\NormalTok{filename}\OperatorTok{);}                               
+
+\NormalTok{    puts}\OperatorTok{(}\StringTok{"Antes de abrir el archivo..."}\OperatorTok{);}
+    \DataTypeTok{int}\NormalTok{ fd }\OperatorTok{=}\NormalTok{ open}\OperatorTok{(}\NormalTok{filename}\OperatorTok{,}\NormalTok{ O\_RDWR }\OperatorTok{|}\NormalTok{ O\_CREAT}\OperatorTok{);}
+\NormalTok{    puts}\OperatorTok{(}\StringTok{"Después de abrir el archivo..."}\OperatorTok{);}
+\NormalTok{    close}\OperatorTok{(}\NormalTok{fd}\OperatorTok{);}
+
+    \ControlFlowTok{return}\NormalTok{ EXIT\_SUCCESS}\OperatorTok{;}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Definir la macro \texttt{\_POSIX\_C\_SOURCE} con el valor
+  \texttt{200809L} activa que las cabeceras expongan definiciones
+  correspondientes a la especificación POSIX.1-2008.
+\item
+  Genera un nombre de archivo que no exista en el sistema de archivos
+  usando la plantilla indica por \texttt{filename}. Esta función
+  pertenece al estándar POSIX.1-2008.
+\end{itemize}
+
+Este mecanismo tiene la doble ventaja de que:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Al tener que incluir las macros sabemos los requisitos mínimos del
+  sistema donde podremos compilar y ejecutar nuestro programa, aunque no
+  estemos preocupados por cumplir con un estándar concreto.
+\item
+  Si es un requisito del proyecto que se ejecute en sistemas con un
+  estándar particular, solo tenemos que incluir la macro correspondiente
+  y el compilador no nos dejará usar definiciones no incluidas en la
+  especificación indicada.
+\end{enumerate}
+
+Los sistemas POSIX pueden soportar muchas otras
+\{linux\_feature\_test\_macros\}, según las especificaciones y
+extensiones soportadas por la librería del sistema. Las de uso más común
+en los sistemas GNU son:
+
+\begin{itemize}
+\item
+  \texttt{\_POSIX\_C\_SOURCE}. Según el valor asignado a esta macro se
+  establece la especificación POSIX que debe activarse para el programa.
+  Los valores válidos se indican en la documentación de las
+  \{linux\_feature\_test\_macros\}.
+\item
+  \texttt{\_XOPEN\_SOURCE}. Definiendo esta macro se indica la
+  especificación de la \href{https://es.wikipedia.org/wiki/X/Open}{Guía
+  de portabilidad X/Open} que debe activarse para el programa. Según el
+  valor se activarán ciertas especificaciones POSIX junto con algunas
+  extensiones adicionales.
+\item
+  \texttt{\_BSD\_SOURCE}. Activa funcionalidades específicas de los
+  sistemas BSD.
+\item
+  \texttt{\_DEFAULT\_SOURCE}. Activa las especificaciones y extensiones
+  por defecto, por si se diera el caso de que han sido desactivas de
+  alguna manera. Las definiciones por defecto incluyen: POSIX.1-2008,
+  ISO C99 y algunas funcionalidades extra de sistemas UNIX BSD y System
+  V.
+\item
+  \texttt{\_GNU\_SOURCE}. Activa \texttt{\_DEFAULT\_SOURCE} y
+  extensiones específicas de los sistemas GNU.
+\end{itemize}
+
+\section{Llamadas al sistema}\label{_llamadas_al_sistema}
+
+{} Para un programa, acceder a los servicios del sistema operativo no es
+tan sencillo como invocar una función. Para invocar una función, un
+programa necesita conocer la dirección en la memoria del punto de
+entrada de dicha función ---es decir, la ubicación de su primera
+instrucción---. Sin embargo, el código del núcleo del sistema puede
+estar en cualquier ubicación de la memoria principal. Así que las
+direcciones de los puntos de entrada a las funciones del núcleo son
+desconocidas. Además, generalmente, el código y los datos del núcleo
+están protegidos frente a accesos indebidos (véase el
+\hyperref[_protecciuxf3n_de_la_memoria]{???}). Eso significa que para
+que un proceso pueda invocar los servicios que necesita hace falta un
+procedimiento diferente, denominado \textbf{llamada al sistema}.
+
+\subsection{Invocar llamadas al
+sistema}\label{_invocar_llamadas_al_sistema}
+
+Generalmente una llamada al sistema se invoca mediante una instrucción
+específica en lenguaje ensamblador que genera una \textbf{excepción}
+---que no es más que una interrupción lanzada por la propia CPU al
+detectar instrucciones especiales o un error al ejecutar una
+instrucción, como una división por 0 o un acceso indebido a ciertas
+zonas de la memoria---. Por ejemplo, en MIPS e Intel x86 se usa la
+instrucción \texttt{syscall}, que lanza una excepción, haciendo que la
+CPU salte a una rutina en el código del núcleo del sistema, deteniendo
+así la ejecución del proceso que la invocó.
+
+Al realizar una llamada, es necesario que el sistema sepa qué operación
+le está pidiendo el proceso. Esto se suele hacer poniendo un número
+identificativo de la llamada en un registro concreto de la CPU. Por
+ejemplo, en Linux para x86 la llamada al sistema \{linux\_open\} ---que
+se utiliza para abrir archivos--- se identifica con el número 2 o con el
+5, según si es en 64 o en 32 bits, respectivamente. Este número se debe
+guardar en el registro \texttt{v0} en MIPS o \texttt{eax} en x86, antes
+de la instrucción \texttt{syscall}.
+
+Los números utilizados para identificar cada llamada al sistema dependen
+del sistema operativo. Mientras que el registro donde se guarda, la
+instrucción utilizada y el resto de detalles sobre cómo realizar la
+llamada, dependen también de la arquitectura de la CPU.
+
+\subsection{Paso de argumentos}\label{_paso_de_argumentos}
+
+Obviamente una llamada al sistema suele requerir más información que la
+identidad de la llamada. Si, por ejemplo, se quiere abrir un archivo, al
+menos es necesario indicar su nombre, así como si se abre para leer o
+para escribir.
+
+En concreto hay tres métodos para pasar parámetros adicionales al
+identificador a una llamada al sistema:
+
+\begin{itemize}
+\item
+  \textbf{Mediante registros de la CPU}. Consiste en cargar los
+  parámetros de la llamada al sistema en los registros de la CPU antes
+  de realizar la llamada al sistema. Este método es el más eficiente,
+  pero limita el número de parámetros al número de registros
+  disponibles.
+
+  Es utilizado, por ejemplo, en Linux para MIPS (véase el
+  \hyperref[ejemplo-linux-mips-syscall]{example\_title}) y en la mayoría
+  de sistemas operativos para x86-64.
+\item
+  \textbf{Mediante tabla en memoria} Consiste en copiar los parámetros
+  de la llamada al sistema en una tabla en la memoria principal y luego
+  guardar la dirección de dicha tabla en un registro específico de la
+  CPU, antes de la llamada al sistema. Así no se limita el número de
+  parámetros que pueden ser pasados en cada llamada al sistema.
+
+  Era utilizado por Microsoft Windows 2000 y anteriores. También en
+  Linux para x86 32 bits, cuando el número de parámetros es superior a
+  6.
+\item
+  \textbf{Mediante la pila del proceso} se insertan los parámetros de la
+  llamada al sistema en la pila del proceso ---que también se suele usar
+  para guardar variables locales y, en algunas arquitecturas, los
+  argumentos pasados al llamar a funciones--- y el sistema operativo los
+  recupera de allí durante la llamada al sistema. Al igual que en el
+  caso anterior, tampoco limita el número de parámetros que pueden ser
+  pasados en cada llamada al sistema.
+
+  Es utilizado, por ejemplo, en sistemas UNIX BSD y en Windows XP y
+  posteriores para x86 de 32 bits.
+\end{itemize}
+
+Veamos cómo invocar directamente la llamada al sistema \{linux\_write\}
+en Linux para MIPS.
+
+Esta llamada sirve para escribir datos en un archivo. Así que necesita
+tres argumentos:
+
+\begin{itemize}
+\item
+  \textbf{SIZE}: El número de bytes a escribir.
+\item
+  \textbf{BUFFER}: La dirección de la memoria de la que coger los bytes.
+\item
+  \textbf{FILEDES}: El descriptor que identifica a un archivo abierto
+  donde se van a escribir los datos.
+\end{itemize}
+
+Al terminar devuelve el número de bytes escritos en el archivo, que
+puede ser inferior a \texttt{SIZE}.
+
+El identificador de la llamada al sistema es 4004, según el
+\href{https://github.com/torvalds/linux/blob/v4.20/arch/mips/include/uapi/asm/unistd.h}{listado
+de llamadas al sistema} para Linux en MIPS.
+
+\begin{verbatim}
+  lw      $a0, FILEDES   
+  la      $a1, BUFFER    
+  lw      $a2, SIZE      
+  li      $v0, 40004     
+  syscall                
+\end{verbatim}
+
+\begin{itemize}
+\item
+  Cargar cada uno de los 3 argumentos de la llamada al sistema en los
+  registros \texttt{a0}, \texttt{a1} y \texttt{a2}.
+\item
+  Cargar el identificador de la llamada \texttt{write()} en el registro
+  \texttt{v0}.
+\item
+  Invocar la llamada al sistema. Aunque vemos que es una única
+  instrucción, lo que realmente va a ocurrir es que el sistema operativo
+  va a tomar el control de la CPU para realizar la tarea solicitada. La
+  siguiente instrucción no comenzará a ejecutarse hasta que el sistema
+  operativo no lo decida, por lo que, desde el punto de vista del
+  programa, va a ser como si \texttt{syscall} fuera una instrucción más
+  lenta de lo normal.
+\item
+  Al ejecutar la siguiente instrucción del código del programa, el
+  registro \texttt{v0} contendrá el número de bytes escritos.
+\end{itemize}
+
+En \{syscall\_s\} se puede ver un ejemplo completo similar, pero para
+Linux x86 de 64 bits.
+
+En cualquier caso, sea cual sea el método utilizado, el sistema
+operativo es responsable de comprobar de manera estricta la validez de
+los parámetros enviados en la llamada al sistema antes de realizar
+cualquier operación, puesto que nunca debe confiar en que los procesos
+hagan su trabajo correctamente. A fin de cuentas, una de las funciones
+del sistema operativo es el control de dichos procesos.
+
+\section{Librería del sistema}\label{_libreruxeda_del_sistema}
+
+{} Las \textbf{llamadas al sistema} proporcionan una interfaz con la que
+los procesos pueden invocar los servicios que el sistema operativo
+ofrece. El problema es que como se hacen mediante instrucciones en
+lenguaje ensamblador (véase el
+\hyperref[ejemplo-linux-mips-syscall]{example\_title}) no son demasiado
+cómodas de utilizar. Así que generalmente los programas no las invocan
+directamente. En su lugar, lo que hacen es llamar a funciones de la
+\textbf{librería del sistema}, que a su vez son las encargadas de hacer
+las llamadas al sistema necesarias.
+
+Cuando hablamos anteriormente de \{windows\_api\} y del estándar
+\{posix\}, hablábamos de la interfaz de la \textbf{librería del sistema}
+en esos sistemas operativos.
+
+La \textbf{librería del sistema}:
+
+\begin{itemize}
+\item
+  Es parte del sistema operativo, por lo que se distribuye con él.
+\item
+  Es una colección de clases o funciones que ofrecen los servicios del
+  sistema operativo a los programas, apoyándose en las llamadas al
+  sistema.
+
+  Algunas funciones de la librería del sistema son traducciones
+  literales de llamadas al sistema ---por ejemplo, \{linux\_write\} o
+  \{linux\_close\}--- mientras que otras pueden ser más complejas, hacer
+  más trabajo o mostrar conceptos más abstractos que los usados por el
+  sistema operativo al nivel de llamadas al sistema.
+\item
+  Constituye la verdadera \textbf{interfaz de programación de
+  aplicaciones} del sistema operativo. Es la forma recomendada de
+  solicitar servicios al sistema operativo. Invocar directamente las
+  llamadas al sistema debe ser el último recurso.
+\item
+  Sus funciones se llaman como cualquier otra. Al igual que el resto de
+  librerías, se carga dentro de la región de memoria asignada al
+  proceso. Por lo tanto, la invocación de las funciones de la librería
+  del sistema se realiza como si fueran cualquier otra función del
+  programa.
+\item
+  Es muy común que esté implementada en C, lo que permite que tanto los
+  programas en C como en C++ la puedan utilizar directamente.
+\end{itemize}
+
+\section{Librería estándar}\label{_libreruxeda_estuxe1ndar}
+
+{} Lenguajes distintos de C y C++ pueden tener difícil usar las
+funciones de la librería del sistema. Pero de alguna forma deben poder
+hacerlo, porque sus programadores necesitan acceso a los servicios que
+ofrece el sistema operativo.
+
+Incluso en C y en C++ puede ser interesante tener acceso a
+funcionalidades adicionales a las ofrecidas por la API del sistema
+operativo: estructuras de datos, algoritmos de ordenamiento o búsqueda,
+funciones para manipular cadenas, funciones matemáticas, etc. También
+abstracciones de los servicios del sistema, que encajen mejor con las
+particularidades del lenguaje de programación en cuestión. Por ejemplo,
+utilizando clases y objetos en lenguajes que soportan programación
+orientada a objetos.
+
+Por eso, junto a cada intérprete o compilador de cada lenguaje de
+programación suele ir una \textbf{librería estándar} que ofrece clases o
+funciones con las que los programas pueden acceder a los servicios del
+sistema operativo y realizar las tareas más comunes de forma más
+sencilla.
+
+Estas librerías generalmente no forman parte del sistema operativo, sino
+de las herramientas de desarrollo de cada lenguaje de programación, y
+constituyen la \textbf{interfaz de programación de aplicaciones} del
+lenguaje al que acompañan.
+
+La \textbf{librería estándar} necesita acceder a los servicios del
+sistema operativo para, a su vez, dar servicio a los programas que la
+usan. Es decir, cuando un programa invoca alguna función o método de la
+librería estándar que lo acompaña, es muy probable que esta necesite
+invocar uno o más servicios del sistema operativo para atender la
+petición convenientemente. Para ello la \textbf{librería estándar}
+utiliza la \textbf{librería del sistema} que acompaña al sistema
+operativo, que a su vez realiza las \textbf{llamadas al sistema}
+necesarias.
+
+Un ejemplo del papel de las \textbf{librerías estándar} lo podemos
+encontrar en el acceso a los archivos.
+
+Las llamadas al sistema y la librería del sistema de los sistemas
+operativos ofrecen funciones básicas para manipular archivos. Los
+archivos se abren indicando su ruta y, al hacerlo, el sistema operativo
+devuelve un identificador del archivo abierto (véase \{linux\_open\}).
+Este identificador se puede usar para leer o escribir en bytes el
+contenido del archivo.
+
+Sin embargo en C, C++ y otros lenguajes, todo lo que son flujos de datos
+se generalizan en el concepto de flujo o \emph{stream} (véase
+\{clang\_stdio\} e \{cpp\_iostream\}). En él se incluye la entrada de
+teclado y la salida por pantalla, la impresión de documentos, las
+conexiones de red ---potencialmente--- y, obviamente, el acceso a
+archivos y a dispositivos.
+
+Los flujos pueden ser de texto o binarios, lo que implica algunas
+transformaciones en los datos. Además van ligados al concepto del
+\emph{buffering}, es decir, que los bytes o caracteres escritos en el
+flujo no se «envían» inmediatamente, sino que se acumulan en la memoria
+para ser enviados en bloque.
+
+Todas estas características adicionales las implementa la
+\textbf{librería estándar}. Pero por debajo, al final, los datos tienen
+que ser escritos en un archivo, una impresora o el monitor, recursos que
+gestiona el sistema operativo. Por lo tanto, las \textbf{librerías
+estándar} necesitan hacer uso de la \textbf{librería del sistema} para
+comunicarse con el sistema operativo.
+
+Algo que suele ocurrir al crear mayores abstracciones es que se suele
+perder control y características específicas. Por ejemplo, la llamada al
+sistema \{linux\_open\} con la que se pueden crear archivos permite
+asignar permisos o crear archivos temporales. Sin embargo, con las
+interfaces de \emph{streams} de C y C++ no se puede hacer eso, ya que
+los permisos y la temporalidad son propiedades de los archivos que no
+son comunes a todas fuentes de flujos de datos.
+
+Así que en ocasiones puede ser que nos resulte más útil llamar a las
+funciones de la \textbf{librería del sistema}, que usar las facilidades
+de la \textbf{librería estándar}. Sin embargo, debemos valorar que así
+perdemos portabilidad, ya que ahora nuestro programa ya no podrá usarse
+allí donde haya un compilador o intérprete de nuestro lenguaje, sino
+solo en sistemas operativos con una \textbf{librería del sistema}
+compatible.
+
+\section{Con todas las piezas
+juntas}\label{_con_todas_las_piezas_juntas}
+
+En la \hyperref[fig-api-win32]{Elementos de la interfaz de programación
+de aplicaciones en Microsoft Windows.} se ilustra el papel de todos los
+elementos comentados, con el ejemplo de programas en C y Python,
+ejecutados en Microsoft Windows, que invocan los métodos
+\{clang\_fopen\} y \texttt{file()} de la librería estándar de estos
+lenguajes, respectivamente.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C06_api/interfaz_programación_aplicaciones_win32.pdf}
+\caption{Elementos de la interfaz de programación de aplicaciones en
+Microsoft Windows.}\label{fig-api-win32}
+\end{figure}
+
+En ambos casos, la librería estándar llama a la función
+\{win32\_createfile\} de la librería del sistema de Windows, que
+finalmente realiza una llamada al sistema que hace que el sistema
+operativo tome el control, deteniendo la ejecución del proceso que la
+solicita. Entonces se realiza la tarea solicitada mediante el
+funcionamiento coordinado de los diferentes componentes del sistema
+(véase el \hyperref[componentes_del_sistema]{???}).
+
+El programa en C, puede usar tanto la función \{clang\_fopen\} de su
+librería estándar como llamar directamente a la función
+\{win32\_createfile\} de la librería del sistema ---marcado en rojo en
+la \hyperref[fig-api-win32]{Elementos de la interfaz de programación de
+aplicaciones en Microsoft Windows.}---. Sin embargo, en el programa en
+Python no tenemos esa facilidad ---al menos directamente---.
+
+Usar directamente las funciones de la librería del sistema desde
+programas en C o C++ tiene la ventaja de que permite utilizar todas las
+características del sistema operativo. Por ejemplo, utilizar las
+opciones adicionales de \{win32\_createfile\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{HANDLE WINAPI CreateFile}\OperatorTok{(}
+\NormalTok{  LPCTSTR lpFileName}\OperatorTok{,}                           
+\NormalTok{  DWORD dwDesiredAccess}\OperatorTok{,}                        
+\NormalTok{  DWORD dwShareMode}\OperatorTok{,}                            
+\NormalTok{  LPSECURITY\_ATTRIBUTES lpSecurityAttributes}\OperatorTok{,}   
+\NormalTok{  DWORD dwCreationDisposition}\OperatorTok{,}                  
+\NormalTok{  DWORD dwFlagsAndAttributes}\OperatorTok{,}                   
+\NormalTok{  HANDLE hTemplateFile                          }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Nombre del archivo.
+\item
+  Modo de acceso: lectura o escritura.
+\item
+  Modo en el que se compartirá el archivo con otros procesos que accedan
+  al mismo tiempo.
+\item
+  Permisos del archivo, en caso de crearlo.
+\item
+  Acción en caso de que el archivo exista o no: siempre crear, solo
+  abrir, truncar si existe, etc.
+\item
+  Atributos del archivo, en caso de crearlo.
+\item
+  Archivo abierto del que copiar los atributos para copiarlo en este, en
+  caso de crearlo.
+\end{itemize}
+
+que \{clang\_fopen\} no posee:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{FILE}\OperatorTok{*}\NormalTok{ fopen}\OperatorTok{(}
+  \DataTypeTok{const} \DataTypeTok{char} \OperatorTok{*}\NormalTok{path}\OperatorTok{,} 
+  \DataTypeTok{const} \DataTypeTok{char} \OperatorTok{*}\NormalTok{mode  }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Nombre del archivo.
+\item
+  Modo de acceso: lectura o escritura.
+\end{itemize}
+
+Sin embargo, debemos tener en cuenta que se pierde portabilidad pues
+\{win32\_createfile\} solo está disponible en Microsoft Window, mientras
+que \{clang\_fopen\} viene con la librería estándar de cualquier
+compilador de C.
+
+En la \hyperref[fig-api-posix]{Elementos de la interfaz de programación
+de aplicaciones en GNU/Linux.} se puede observar un ejemplo similar en
+\{gnulinux\} ---un sistema compatible \{posix\}--- pero en esta ocasión
+con programas en C y C++. En este caso la llamada al sistema es
+\{linux\_open\} y tanto \{clang\_fopen\} en C como
+\{cpp\_ofstream\_open\} en C++ la utilizan. Además, ambos lenguajes
+pueden invocar directamente la librería del sistema ---marcado en rojo
+en la \hyperref[fig-api-posix]{Elementos de la interfaz de programación
+de aplicaciones en GNU/Linux.}--- si necesitan alguna característica
+adicional de la función \{linux\_open\}.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C06_api/interfaz_programación_aplicaciones_posix.pdf}
+\caption{Elementos de la interfaz de programación de aplicaciones en
+GNU/Linux.}\label{fig-api-posix}
+\end{figure}
+
+La única diferencia es que en \hyperref[fig-api-posix]{Elementos de la
+interfaz de programación de aplicaciones en GNU/Linux.} las funciones
+\{clang\_fopen\} y \{linux\_open\} están realmente en la misma librería,
+porque en los sistemas POSIX la librería del sistema y la librería
+estándar de C pueden ser la misma, dado que el estándar POSIX se diseñó
+como un superconjunto de la librería estándar de C.

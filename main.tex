@@ -1,0 +1,57 @@
+% 'spanish' NO es una opción válida de la clase book.
+% El idioma lo gestiona babel en preamble.tex.
+\documentclass[12pt,a4paper]{book}
+\input{config/preamble}
+
+\begin{document}
+
+\frontmatter
+\input{config/portada}
+\tableofcontents
+
+\mainmatter
+
+% ── Parte I: Introducción ─────────────────────────────────
+\part{Introducci\'{o}n}
+\input{partes/P01_preambulo}
+\include{capitulos/C01_definicion}
+\include{capitulos/C02_tipos_de_sistemas}
+\include{capitulos/C03_historia}
+
+% ── Parte II: Organización ───────────────────────────────
+\part{Organizaci\'{o}n de los sistemas operativos}
+\input{partes/P02_preambulo}
+\include{capitulos/C04_componentes}
+\include{capitulos/C05_servicios}
+\include{capitulos/C06_api}
+\include{capitulos/C07_modo_dual}
+\include{capitulos/C08_estructura}
+
+% ── Parte III: Gestión de procesos ───────────────────────
+\part{Gesti\'{o}n de procesos}
+\input{partes/P03_preambulo}
+\include{capitulos/C09_procesos}
+\include{capitulos/C10_ipc}
+\include{capitulos/C11_memoria_compartida}
+\include{capitulos/C12_hilos}
+\include{capitulos/C13_sincronizacion}
+\include{capitulos/C14_planificacion}
+
+% ── Parte IV: Gestión de la memoria ──────────────────────
+\part{Gesti\'{o}n de la memoria}
+\input{partes/P04_preambulo}
+\include{capitulos/C15_memoria_principal}
+\include{capitulos/C16_paginacion}
+\include{capitulos/C17_memoria_virtual}
+
+% ── Parte V: Gestión del almacenamiento ──────────────────
+\part{Gesti\'{o}n del almacenamiento}
+\input{partes/P05_preambulo}
+\include{capitulos/C18_almacenamiento}
+\include{capitulos/C19_sistema_de_archivos}
+\include{capitulos/C20_implemantacion_sistema_de_archivos}
+
+\backmatter
+\printindex
+
+\end{document}

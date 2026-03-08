@@ -1,0 +1,1433 @@
+\section{}
+
+\textbf{Tiempo de lectura:} \{s13-reading-time\}
+
+En el \hyperref[memoria_compartida]{???} vimos que varios procesos
+pueden compartir regiones de la memoria con el objeto de cooperar en las
+tareas que deben desempeñar. Además, en el \hyperref[hilos]{???} vimos
+que en los procesos multihilo todos los hilos comparten el espacio de
+direcciones del proceso al que pertenecen, lo que significa que pueden
+acceder al mismo tiempo a las variables globales y a la memoria
+reservada dinámicamente.
+
+Ambas posibilidades introducen algunos riesgos, puesto que el acceso
+simultáneo a los datos compartidos puede ocasionar inconsistencias. Así
+que ha llegado el momento de discutir cómo se puede asegurar la
+ejecución ordenada de hilos o procesos cooperativos que comparten
+regiones de la memoria, con el fin de mantener la consistencia de los
+datos.
+
+En este capítulo hablaremos de hilos y de procesos que comparten memoria
+indistintamente. En ambos casos el problema es el mismo y las soluciones
+similares.
+
+\section{El problema de las secciones
+críticas}\label{_el_problema_de_las_secciones_cruxedticas}
+
+Llamamos \textbf{{}condición de carrera} a la situación en la que varios
+procesos o hilos pueden acceder y manipular los mismos datos al mismo
+tiempo ---es decir, de forma \textbf{{}concurrente}--- y donde el
+resultado de la ejecución depende del orden particular en el que tienen
+lugar dichos accesos. Estas situaciones ocurren frecuentemente en los
+sistemas operativos, puesto que diferentes componentes del mismo
+manipulan los mismos recursos interfiriendo unos con otros.
+
+\subsection{Problema del
+productor-consumidor}\label{_problema_del_productor_consumidor}
+
+Para ilustrarlo, veamos un problema clásico de concurrencia: el
+\textbf{problema del {}productor-consumidor}.
+
+Supongamos que dos hilos o procesos comparten una región de la memoria
+que contiene un vector de elementos y un contador con el número de
+elementos del vector.
+
+El primer hilo realiza varias tareas, que no entraremos a describir. Lo
+importante es que, como resultado de esas tareas, en ocasiones añade un
+elemento al vector e incrementa el contador que indica el número de
+elementos en el vector. Es decir, el primer hilo actúa como un
+\textbf{{}productor} de elementos del vector.
+
+A continuación mostramos una porción de la función del productor:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{while}\OperatorTok{(}\CommentTok{/* ... */}\OperatorTok{)}
+\OperatorTok{\{}
+\NormalTok{    item }\OperatorTok{=}\NormalTok{ produce\_item}\OperatorTok{();}
+
+    \CommentTok{// Si el vector está lleno, esperar}
+    \ControlFlowTok{while} \OperatorTok{(}\NormalTok{count }\OperatorTok{==}\NormalTok{ VECTOR\_SIZE}\OperatorTok{);}
+
+    \CommentTok{// Añadir el elemento al vector}
+\NormalTok{    vector}\OperatorTok{[}\NormalTok{count}\OperatorTok{]} \OperatorTok{=}\NormalTok{ item}\OperatorTok{;}
+    \OperatorTok{++}\NormalTok{count}\OperatorTok{;}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+El segundo hilo también realiza varias tareas que no describiremos. Pero
+para realizar esas tareas en ocasiones debe tomar un elemento del vector
+compartido, decrementando el contador para indicar que ahora hay un
+elemento menos en el vector. Es decir, el segundo hilo actúa como un
+\textbf{{}consumidor} de elementos del vector.
+
+A continuación mostramos una porción de la función del consumidor:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{while}\OperatorTok{(}\CommentTok{/* ... */}\OperatorTok{)}
+\OperatorTok{\{}
+    \CommentTok{// Si el vector está vacio, esperar}
+    \ControlFlowTok{while} \OperatorTok{(}\NormalTok{count }\OperatorTok{==} \DecValTok{0}\OperatorTok{);}
+
+    \CommentTok{// Extraer un elemento del vector}
+    \OperatorTok{{-}{-}}\NormalTok{count}\OperatorTok{;}
+\NormalTok{    item }\OperatorTok{=}\NormalTok{ vector}\OperatorTok{[}\NormalTok{count}\OperatorTok{];}
+
+\NormalTok{    consume\_item}\OperatorTok{(}\NormalTok{item}\OperatorTok{);}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Aunque el \textbf{problema del productor-consumidor} parezca artificial,
+lo cierto es que es muy común.
+
+Por ejemplo, en una herramienta de grabación de audio, el
+\textbf{productor} es un hilo dedicado a obtener bloques de muestras
+grabadas a través de la API multimedia del sistema operativo. Mientras
+tanto, otro hilo puede dedicarse a tomar las muestras y realizar
+diversas transformaciones, como: reducir el ruido, mezclar con otras
+fuentes de sonido o aplicar algún tipo de efecto digital. Este segundo
+hilo es el \textbf{consumidor}. La manera de conectar ambos es tener un
+vector compartido, donde se depositan los bloques de muestras cuando
+llegan y de dónde se extraen para su tratamiento. Así, ambos hilos
+pueden trabajar a su propio ritmo, de forma casi independiente.
+
+Aunque el código anterior del productor y del consumidor es correcto
+cuando no coinciden en el tiempo al ejecutarse, no funciona
+adecuadamente cuando sí lo hacen. El motivo es que los dos hilos
+comparten y modifican la variable \texttt{count}.
+
+Obviamente, las sentencias \texttt{++count} y \texttt{-\/-count} pueden
+modificar \texttt{count} al mismo tiempo si los hilos se ejecutan en
+núcleos diferentes en máquinas multiprocesador o multinúcleo. Eso
+también puede ocurrir en máquinas monoprocesador con sistemas operativos
+con planificación expropiativa (véase el
+\hyperref[_planificaciuxf3n_expropiativa]{???}) dado que en esos
+sistemas un hilo puede ser interrumpido en cualquier momento para dar
+paso a la ejecución de otro.
+
+Por ejemplo, \texttt{++count} podría dividirse por el compilador en las
+siguientes operaciones, al generar las instrucciones del procesador:
+
+\textbf{++count}
+
+\begin{verbatim}
+registro1 = [count];
+registro1 = registro1 + 1;
+[count] = registro1;
+\end{verbatim}
+
+Donde \texttt{registro1} representa un registro de la CPU. De forma
+parecida la sentencia \texttt{-\/-count} podría ser implementada de la
+siguiente manera:
+
+\textbf{-\/-count}
+
+\begin{verbatim}
+registro2 = [count];
+registro2 = registro2 - 1;
+[count] = registro2;
+\end{verbatim}
+
+Donde nuevamente \texttt{registro2} representa un registro de la CPU.
+
+Aunque \texttt{registro1} y \texttt{registro2} pueden ser el mismo
+registro físico, el contenido de los registros se guarda y se recupera
+durante los cambios de contexto de un hilo al otro, por lo que es
+indiferente si son el mismo o registros diferentes.
+
+En sistemas monoprocesador, el que las sentencias \texttt{++count} y
+\texttt{-\/-count} se ejecute de forma concurrente, es similar a que las
+instrucciones de lenguaje máquina de ambas sentencias en ambos hilos o
+procesos se entrelacen en algún orden aleatorio.
+
+Por ejemplo, un posible entrelazado de las instrucciones en lenguaje
+máquina entre hilos, suponiendo que inicialmente \texttt{count\ =\ 5},
+podría ser el siguiente:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{// Entra ++count}
+\NormalTok{registro1 }\OperatorTok{=} \OperatorTok{[}\NormalTok{count}\OperatorTok{];}        \CommentTok{// registro1 = 5}
+\NormalTok{registro1 }\OperatorTok{=}\NormalTok{ registro1 }\OperatorTok{+} \DecValTok{1}\OperatorTok{;}  \CommentTok{// registro1 = 6}
+\CommentTok{// Sale ++count y entra {-}{-}count}
+\NormalTok{registro2 }\OperatorTok{=} \OperatorTok{[}\NormalTok{count}\OperatorTok{];}        \CommentTok{// registro2 = 5}
+\NormalTok{registro2 }\OperatorTok{=}\NormalTok{ registro2 }\OperatorTok{{-}} \DecValTok{1}\OperatorTok{;}  \CommentTok{// registro2 = 4}
+\CommentTok{// Sale {-}{-}count y entra ++count}
+\OperatorTok{[}\NormalTok{count}\OperatorTok{]} \OperatorTok{=}\NormalTok{ registro1}\OperatorTok{;}        \CommentTok{// count = 6 }
+\CommentTok{// Entra {-}{-}count}
+\OperatorTok{[}\NormalTok{count}\OperatorTok{]} \OperatorTok{=}\NormalTok{ registro2}\OperatorTok{;}        \CommentTok{// count = 4 }
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Así llegamos al resultado incorrecto \texttt{count\ =\ 4}, indicando
+  que hay 4 elementos en el vector cuando realmente hay 5.
+\item
+  Si invertimos el orden de las sentencias obtendremos el resultado,
+  también incorrecto, \texttt{count\ =\ 6}.
+\end{itemize}
+
+Como se puede apreciar, hemos llegado a estos valores incorrectos porque
+hemos permitido la manipulación concurrente de la variable
+\texttt{count}. Según como se entrelacen las instrucciones de
+\texttt{++count} y \texttt{-\/-count} en la CPU, el resultado final
+podría ser: 4, 5 o 6. Sin embargo, el único resultado correcto es 5, que
+es el que obtendremos si ejecutamos las sentencias secuencialmente, sin
+mezclar las operaciones en las que se dividen.
+
+\subsection{Manipular estructuras de
+datos}\label{_manipular_estructuras_de_datos}
+
+Obviamente, el problema comentado no aparece solo en sentencias simples,
+sino también en bloques de código destinados a hacer tareas complejas,
+como manipular estructuras de datos.
+
+Por ejemplo, supongamos que \texttt{vector} no es un simple \emph{array}
+de elementos, sino una lista enlazada, de tal forma que ahora extraer un
+elemento sería así:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OperatorTok{{-}{-}}\NormalTok{count}\OperatorTok{;}
+\NormalTok{item }\OperatorTok{=}\NormalTok{ vector}\OperatorTok{.}\NormalTok{extract}\OperatorTok{(}\NormalTok{count}\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+y el método \texttt{extract()} tendría que dar los siguientes pasos:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Iterar sobre la lista para buscar el nodo en la posición
+  \texttt{count}.
+\item
+  Al encontrarlo, preservar en variables locales el puntero a ese nodo y
+  al previo.
+\item
+  Cambiar en el nodo previo el puntero al siguiente nodo, para que
+  apunte al nodo tras el que queremos extraer. En este momento el nodo a
+  extraer ya no pertenece a la lista enlazada.
+\item
+  Extrae el \texttt{item} del campo que lo contiene en el nodo.
+\item
+  Destruir el nodo.
+\item
+  Salir del método retornando el elemento.
+\end{enumerate}
+
+Esto genera varios momentos cruciales en torno al paso 3, que puedan dar
+lugar a \textbf{condiciones de carrera}. Por ejemplo, si el hilo es
+interrumpido tras guardar el puntero al nodo en una variable local y
+llega otro hilo que extrae ---y destruye--- antes ese mismo nodo, el
+puntero ya no es válido ---es un \emph{dangling pointer} o referencia
+colgante--- al continuar la ejecución del primer hilo. Y lo mismo ocurre
+con el puntero al nodo previo o al siguiente, si el hilo es interrumpido
+y otro hilo destruye antes alguno de ellos.
+
+Los problemas que esto puede causar son diversos, según el momento
+exacto en el que ocurra. Puede haberlos al intentar leer el elemento
+guardado en el nodo en el paso 4, porque este último ya no exista.
+También, al intentar actualizar, en el paso 3, el puntero al siguiente
+nodo en el nodo previo, porque el nodo previo no exista. Incluso puede
+que la función termine con aparente normalidad, pero dejando que el nodo
+previo apunte a un nodo siguiente que no existe. En este último
+supuesto, la lista quedaría en estado inconsistente y así el problema se
+lo encontraría el próximo hilo que intente usarla.
+
+\subsection{Exclusión mutua}\label{_exclusiuxf3n_mutua}
+
+Para evitar que estas situaciones lleven a la corrupción de datos y a
+caídas de servicios y sistemas, debemos asegurarnos que solo un hilo en
+cada momento puede manipular recursos y variables compartidas. Por
+tanto, necesitamos algún tipo de mecanismo de sincronización para que
+mientras se ejecuta \texttt{++count} no se pueda ejecutar
+\texttt{-\/-count} en otro hilo, ni viceversa. O para que mientras un
+hilo haga un \texttt{insert()} o un \texttt{extract()} en una lista,
+otro no pueda utilizar ni estas ni otras funciones de la misma clase.
+
+Para resolver esto, debemos empezar buscando las \textbf{secciones
+críticas} de nuestro código. Una \textbf{sección crítica} es una porción
+del código donde se accede a variables, tablas, listas, archivos y otros
+recursos compartidos.
+
+Para evitar \textbf{condiciones de carrera}, el acceso a las
+\textbf{secciones críticas} debe ser controlado, de manera que cuando un
+hilo se esté ejecutando en una sección de este tipo ningún otro pueda
+hacerlo en la suya correspondiente para manipular los mismos recursos.
+En estos casos se dice que existe \textbf{{}exclusión mutua} entre las
+\textbf{secciones críticas}.
+
+\subsection{Eventos}\label{_eventos}
+
+Las \textbf{condiciones de carrera} son el principal problema del código
+anterior del productor y el consumidor, pero no el único. En ambos
+ejemplos se usan bucles para que el hilo espere si el vector está lleno
+o vacío, antes de continuar. A esta técnica se la denomina
+\textbf{espera ocupada}{} o \textbf{espera activa}{} y está
+completamente desaconsejada usarla en código del espacio de usuario,
+porque contribuye a gastar tiempo de CPU inútilmente.
+
+En su lugar, se recomienda usar mecanismos de sincronización ofrecidos
+por el sistema operativo; diseñados para que un hilo o proceso notifique
+eventos a otro, de tal forma que hasta que eso ocurre, el que espera
+permanezca en estado \textbf{esperando}, dejando la CPU para los hilos
+que la necesitan.
+
+\section{Sincronización por
+hardware}\label{_sincronizaciuxf3n_por_hardware}
+
+Las soluciones ofrecidas por el sistema operativo, para resolver los
+problemas anteriores, suelen tener que apoyarse en características del
+hardware. A continuación veremos algunas de esas características, antes
+de profundizar en los mecanismos ofrecidos por el sistema operativo.
+
+\subsection{Bloque de las
+interrupciones}\label{_bloque_de_las_interrupciones}
+
+El problema de la sección crítica puede ser resuelto de forma sencilla
+en un sistema monoprocesador.
+
+Como el núcleo del sistema operativo es un software controlado mediante
+interrupciones, basta con que los hilos bloqueen las interrupciones
+mientras se está dentro de la sección crítica. Así, el sistema operativo
+no puede tomar el control y asignar otro hilo a la CPU, lo que impide
+que se ejecute otra secuencia de instrucciones que podría modificar los
+datos compartidos.
+
+Indudablemente esta solución no es práctica en sistema multiprocesador,
+donde hay varios procesadores ejecutándose a la vez.
+
+\subsection{Instrucciones atómicas}\label{_instrucciones_atuxf3micas}
+
+{} Las CPU modernas disponen de instrucciones para comparar y modificar
+el contenido de una variable o intercambiar el contenido de dos
+variables, de forma \textbf{{}atómica}. El término \textbf{atómico} hace
+referencia a que las operaciones se ejecutan como una unidad
+ininterrumpible. No importa que varias CPU ejecuten estas instrucciones
+simultáneamente, puesto el hardware se encargará de que sean ejecutadas
+secuencialmente en algún orden arbitrario.
+
+En los procesadores MIPS el acceso atómico a la memoria se realiza
+mediante las instrucciones \textbf{\emph{load-linked}} \texttt{ll} y
+\textbf{\emph{store-conditional}} \texttt{sc}.
+
+La instrucción \texttt{ll} caga un valor de la memoria en un registro y
+monitorizar la dirección de memoria correspondiente para detectar si
+otro procesador la modifica. Mientras que la instrucción \texttt{sc}
+intenta almacenar un valor en la dirección de memoria, siempre que dicha
+dirección no haya sido modificada desde la anterior instrucción
+\texttt{ll}.
+
+Ambas instrucciones se utilizan de la siguiente manera para implementar
+una operación atómica de incremento:
+
+\begin{verbatim}
+main:
+  la      r2, count
+
+retry_increment:
+  ll      r1, 0(r2)                 
+  addiu   r1, r1, 1                 
+  sc      r1, 0(r2)                 
+  beqz    r1, retry_increment       
+  nop                               
+\end{verbatim}
+
+\begin{itemize}
+\item
+  Suponiendo que \texttt{r2} contiene la dirección de la variable
+  \texttt{count}, carga el valor de dicha variable en \texttt{r1}.
+\item
+  Incrementa el valor en el registro \texttt{r1}.
+\item
+  Intenta almacenar el valor incrementado en \texttt{count}. Si tiene
+  éxito, porque el valor de \texttt{count} no ha sido modificado por
+  otro proceso, \texttt{r1} se pone a 1. En caso contrario, se pone a 0.
+\item
+  Si \texttt{r1} vale 0, es que la instrucción \texttt{sc} falló porque
+  la variable \texttt{count} fue modificada por otro proceso. En ese
+  caso, se salta a \texttt{retry\_increment} para volver a intentar el
+  incremento de la variable.
+\item
+  Se pone una instrucción para evitar que después de \texttt{beqz} se
+  ponga un instrucción que el procesador ejecute antes del salto.
+\end{itemize}
+
+Antes y después del bloque de instrucciones \texttt{ll} y \texttt{sc},
+generalmente se usa la instrucción \texttt{sync}. Esta instrucción crear
+una barrera de operaciones en memoria, de forma que el procesador se ve
+obligado a completar todas las operaciones en memoria anteriores a
+\texttt{sync} antes de realizar las operaciones en memoria siguientes,
+como \texttt{ll} y \texttt{sc}.
+
+Estas instrucciones están disponibles para los programadores de C y C++
+a través de tipos especiales. Por ejemplo, en C11 \{clang\_stdatomic\}
+define tipos como: \texttt{atomic\_bool}, \texttt{atomic\_uint} o
+\texttt{atomic\_char} para declarar variables atómicas de los tipos
+\texttt{bool}, \texttt{unsigned\ int} y \texttt{char}, respectivamente.
+También declara funciones para inicializar, leer, guardar, intercambiar,
+sumar, restar y realizar operaciones lógicas, de forma atómica sobre
+estas variables:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{atomic\_int count}\OperatorTok{;}
+\NormalTok{atomic\_init}\OperatorTok{(\&}\NormalTok{count}\OperatorTok{,} \DecValTok{0}\OperatorTok{);} 
+\DataTypeTok{int}\NormalTok{ old\_count }\OperatorTok{=}\NormalTok{ atomic\_fetch\_add}\OperatorTok{(\&}\NormalTok{count}\OperatorTok{,} \DecValTok{1}\OperatorTok{);} 
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Inicializar el valor de la variable atómica.
+\item
+  Como un \texttt{count++} atómico: incrementa la variable devolviendo
+  el valor previo.
+\end{itemize}
+
+En C++11, \{cpp\_atomic\_h\} declara la plantilla \{cpp\_atomic\} que
+ofrece una funcionada similar:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\BuiltInTok{std::}\NormalTok{atomic}\OperatorTok{\textless{}}\DataTypeTok{int}\OperatorTok{\textgreater{}}\NormalTok{ count }\OperatorTok{\{}\DecValTok{0}\OperatorTok{\};}  
+\DataTypeTok{int}\NormalTok{ old\_count }\OperatorTok{=}\NormalTok{ count}\OperatorTok{++;}     
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  También hay un tipo \texttt{std::atomic\_int} que es equivalente.
+\item
+  Se usa el constructor para inicializar la variable atómica.
+\item
+  Además de soportar los operadores \textquotesingle++\textquotesingle{}
+  y \textquotesingle-\/-\textquotesingle, soporta los métodos
+  \{cpp\_atomic\_fetch\_add\} y \{cpp\_atomic\_fetch\_sub\} para sumar y
+  restar devolviendo el valor previo.
+\end{itemize}
+
+La importancia de estas instrucciones está en que pueden ser utilizadas
+por el sistema operativo para ofrecer soluciones sencillas al problema
+de la sección crítica. Por ejemplo, \textbf{semáforos} o
+\textbf{\emph{mutex}}.
+
+\section{Semáforos}\label{_semuxe1foros}
+
+{} La exclusión mutua en las secciones críticas se asegura utilizando
+adecuadamente una serie de recursos que para ese fin proporciona el
+sistema operativo. Estos recursos utilizan internamente instrucciones y
+otras características de la CPU, incluidas por los diseñadores para
+resolver este tipo de problemas, que hemos comentado anteriormente. Ese
+es el caso de los \textbf{semáforos}.
+
+Los \textbf{semáforos} son un tipo de objetos del sistema operativo que
+nos permiten controlar el acceso a una sección crítica, por medio de dos
+primitivas: \textbf{acquire} y \textbf{release} ---o \textbf{wait} y
+\textbf{signal}, según el libro de texto que consultemos---.
+
+Los \textbf{semáforos} tienen un contador interno que se inicializa, de
+tal forma que \textbf{un semáforo inicializado a \emph{N} solo permite
+que \emph{N} hilos ejecuten la sección crítica al mismo tiempo}.
+
+A continuación describimos el mecanismo de funcionamiento:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{semaphore S}\OperatorTok{(}\DecValTok{10}\OperatorTok{);}    
+
+\NormalTok{S}\OperatorTok{.}\NormalTok{acquire}\OperatorTok{()}         
+
+\CommentTok{// Código de la sección crítica... }
+
+\NormalTok{S}\OperatorTok{.}\NormalTok{signal}\OperatorTok{();}         
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Crear el \textbf{semáforo} \texttt{S} inicializado a 10. Un
+  \textbf{semáforo} contiene fundamentalmente un contador con el número
+  máximo de hilos que pueden estar ejecutando el código de la sección
+  crítica al mismo tiempo.
+\item
+  Intentar entrar en la sección crítica:
+
+  \begin{itemize}
+  \item
+    Si el contador interno del \textbf{semáforo} es mayor que 0,
+    \texttt{acquire()} lo decrementa y retorna para que la ejecución
+    continúe.
+  \item
+    Si el contador interno del \textbf{semáforo} es igual a 0,
+    \texttt{acquire()} saca al hilo de la CPU y lo pone en una cola de
+    espera, suspendiendo así su ejecución. Básicamente, es que hay
+    demasiados hilos dentro de la sección crítica.
+  \end{itemize}
+\item
+  Aquí iría el código protegido con el \textbf{semáforo}. Es decir, el
+  código de la sección crítica en sí.
+\item
+  Salir de la sección crítica:
+
+  \begin{itemize}
+  \item
+    Si el contador interno del \textbf{semáforo} es mayor que 0,
+    \texttt{release()} lo incrementa y retorna para que la ejecución
+    continúe.
+  \item
+    Si el contador interno del \textbf{semáforo} es igual a 0,
+    \texttt{release()} lo incrementa y saca a uno de los hilos en la
+    cola de espera ---donde los puso su \texttt{acquire()}--- para
+    meterlo en la cola de preparados, dejándolo listo para entrar en la
+    CPU. Cuando eso ocurra, ese hilo decrementará el contador interno
+    del \textbf{semáforo} y saldrá de su \texttt{acquire()}, donde hasta
+    ahora estaba atrapado. Mientras tanto \texttt{release()} retorna y
+    la ejecución del hilo que sale del sección crítica continúa.
+  \end{itemize}
+\end{itemize}
+
+Para que funcione correctamente, el \textbf{semáforo} \texttt{S} debe
+ser el mismo para todos los hilos que tengan secciones críticas en cuya
+ejecución debe haber \textbf{exclusión mutua}. Es decir, el
+\textbf{semáforo} \texttt{S} debe estar compartido entre los hilos de la
+misma manera que las estructuras de datos, variables y otros recursos
+que protege.
+
+\subsection{Tipos de semáforos}\label{_tipos_de_semuxe1foros}
+
+Tanto el estándar POSIX como Windows API soportan semáforos y ambos
+admiten dos tipos de semáforos:
+
+\begin{itemize}
+\item
+  Los \textbf{semáforos anónimos}{} que solo existen en el espacio de
+  direcciones del proceso que los crea, de tal forma que están
+  disponibles para sincronizar hilos del mismo proceso.
+
+  La forma de usarlos para sincronizar procesos diferentes o hilos en
+  procesos diferentes depende del sistema operativo. Con Windows API se
+  pueden heredar de padres a hijos. Mientras que en sistemas POSIX es
+  necesario crear el \textbf{semáforo} en una región de \textbf{memoria
+  compartida}, que hayamos creado previamente, e indicar un valor
+  distinto de 0 en el argumento \texttt{pshared} de
+  \{linux\_sem\_init\}.
+\item
+  Las \textbf{semáforos con nombre}{} son públicos al resto del sistema,
+  por lo que teóricamente cualquier proceso con permisos puede abrirlos
+  para utilizarlos.
+\end{itemize}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\caption{Funciones de la API para manipular semáforos.}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Crear semáforo anónimo} & \{linux\_sem\_init\} &
+\{win32\_createsemaphore\} \\
+\textbf{Crear semáforo con nombre} & \{linux\_sem\_open\} &
+\{win32\_createsemaphore\} \\
+\textbf{Abrir semáforo con nombre} & \{linux\_sem\_open\} &
+\{win32\_opensemaphore\} \\
+\textbf{Operación acquire} & \{linux\_sem\_wait\} &
+\{win32\_waitforsingleobject\} \\
+\textbf{Operación release} & \{linux\_sem\_post\} &
+\{win32\_releasesemaphore\} \\
+\textbf{Cerrar semáforo con nombre} & \{linux\_sem\_close\} &
+\{win32\_closehandle\} \\
+\textbf{Destruir semáforo anónimo} & \{linux\_sem\_destroy\} &
+{{[}Automático{]}} \\
+\textbf{Destruir semáforo con nombre} & \{linux\_sem\_unlink\} &
+{{[}Automático{]}} \\
+\end{longtable}
+
+\subsection{Ejemplos del uso de
+semáforos}\label{_ejemplos_del_uso_de_semuxe1foros}
+
+En el ejemplo \{anom\_shared\_memory\_cpp\} de comunicación mediante
+memoria compartida, se usa un \textbf{semáforo} para que el proceso hijo
+indique al proceso padre que ha terminado de calcular el factorial y el
+resultado ya está en la memoria.
+
+En \{shared\_memory\_cpp\} está el ejemplo completo de un programa que
+muestra periódicamente la hora del sistema y que puede ser controlado
+remotamente, mediante memoria compartida, con un programa como el de
+\{shared\_memory\_control\_cpp\}.
+
+Para enviar los mensajes entre ambos programas, en la memoria compartida
+se reserva hueco para un búfer, en el que el programa de control copia
+el comando que quiere enviar, y para dos \textbf{semáforos}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{struct}\NormalTok{ memory\_content}
+\OperatorTok{\{}
+\NormalTok{    sem\_t empty}\OperatorTok{;} 
+\NormalTok{    sem\_t ready}\OperatorTok{;} 
+    \DataTypeTok{char}\NormalTok{ command\_buffer}\OperatorTok{[}\NormalTok{MAX\_COMMAND\_SIZE}\OperatorTok{];}
+\OperatorTok{\};}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Indica cuándo \texttt{command\_buffer} está vacío, así que se
+  inicializa a 1. El programa de control usa \{linux\_sem\_wait\} en
+  este \textbf{semáforo} antes de escribir un nuevo comando en
+  \texttt{command\_buffer}:
+
+  \begin{itemize}
+  \item
+    Si el \textbf{semáforo} está a 0, el programa de control pasa y
+    escribe el comando. Después llama a \{linux\_sem\_post\} en
+    \texttt{ready}.
+  \item
+    Si el \textbf{semáforo} está a 1, el programa de control queda
+    bloqueado y tiene que esperar a que el programa controlado use
+    \{linux\_sem\_post\} sobre el mismo \textbf{semáforo}. El programa
+    controlado lo hace después de leer el comando para interpretarlo.
+  \end{itemize}
+\item
+  Indica cuándo \texttt{command\_buffer} tiene un comando, así que se
+  inicializa a 0. El programa controlado usa \{linux\_sem\_wait\} en
+  este \textbf{semaforo} antes de leer el comando en
+  \texttt{command\_buffer} para interpretarlo:
+
+  \begin{itemize}
+  \item
+    Si el \textbf{semáforo} está a 0, el programa de control pasa y lee
+    el comando. Después llama a \{linux\_sem\_post\} en \texttt{empty}.
+  \item
+    Si el \textbf{semáforo} está a 1, el programa controlado queda
+    bloqueado y tiene que esperar a que el programa de control use
+    \{linux\_sem\_post\} sobre el mismo \textbf{semáforo}. El programa
+    de control lo hace después de escribir un nuevo comando en
+    \texttt{command\_buffer}.
+  \end{itemize}
+\end{itemize}
+
+El detalle de cómo ambos programas usan los semáforos, se puede ver en
+el código de \{shared\_memory\_control\_cpp\} y \{shared\_memory\_cpp\},
+respectivamente.
+
+Finalmente, para resolver el \textbf{problema del productor-consumidor}
+tenemos que considerar que:
+
+\begin{itemize}
+\item
+  Necesitamos un semáforo para que haya \textbf{exclusión mutua} entre
+  ambos al insertar y extraer elementos del vector.
+\item
+  Necesitamos una forma de que el productor espere cuando el vector esté
+  lleno y que el consumidor haga lo mismo cuando el vector esté vacío.
+  Una solución es usar dos semáforos, uno para que cuente el número de
+  elementos en el vector y otro para contar el número de huecos libres:
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{sem\_t}\NormalTok{ mutex}\OperatorTok{;}       
+\DataTypeTok{sem\_t}\NormalTok{ fill\_count}\OperatorTok{;}  
+\DataTypeTok{sem\_t}\NormalTok{ empty\_count}\OperatorTok{;} 
+
+\BuiltInTok{std::}\NormalTok{vector}\OperatorTok{\textless{}}\DataTypeTok{item\_t}\OperatorTok{\textgreater{}}\NormalTok{ buffer}\OperatorTok{(}\NormalTok{ VECTOR\_SIZE }\OperatorTok{);}
+
+\DataTypeTok{void}\NormalTok{ initialize}\OperatorTok{()}
+\OperatorTok{\{}
+\NormalTok{    sem\_init}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex}\OperatorTok{,} \DecValTok{0}\OperatorTok{,} \DecValTok{1} \OperatorTok{);}  
+\NormalTok{    sem\_init}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex}\OperatorTok{,} \DecValTok{0}\OperatorTok{,} \DecValTok{0} \OperatorTok{);}  
+\NormalTok{    sem\_init}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex}\OperatorTok{,} \DecValTok{0}\OperatorTok{,}\NormalTok{ VECTOR\_SIZE }\OperatorTok{);}  
+\OperatorTok{\}}
+
+\DataTypeTok{void}\NormalTok{ productor}\OperatorTok{()}
+\OperatorTok{\{}
+    \CommentTok{// ...}
+
+    \ControlFlowTok{while}\OperatorTok{(}\CommentTok{/* ... */}\OperatorTok{)}
+    \OperatorTok{\{}
+        \DataTypeTok{item\_t}\NormalTok{ item }\OperatorTok{=}\NormalTok{ produce\_item}\OperatorTok{();}
+
+\NormalTok{        sem\_wait}\OperatorTok{(} \OperatorTok{\&}\NormalTok{empty\_count }\OperatorTok{);} 
+\NormalTok{        sem\_wait}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex }\OperatorTok{);}       
+
+\NormalTok{        vector}\OperatorTok{.}\NormalTok{push\_back}\OperatorTok{(}\NormalTok{item}\OperatorTok{);}
+
+\NormalTok{        sem\_post}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex }\OperatorTok{);}       
+\NormalTok{        sem\_post}\OperatorTok{(} \OperatorTok{\&}\NormalTok{fill\_count }\OperatorTok{);}  
+    \OperatorTok{\}}
+
+    \CommentTok{// ...}
+\OperatorTok{\}}
+
+\DataTypeTok{void}\NormalTok{ consumer}\OperatorTok{()}
+\OperatorTok{\{}
+    \CommentTok{// ...}
+
+    \ControlFlowTok{while}\OperatorTok{(}\CommentTok{/* ... */}\OperatorTok{)}
+    \OperatorTok{\{}
+\NormalTok{        sem\_wait}\OperatorTok{(} \OperatorTok{\&}\NormalTok{fill\_count }\OperatorTok{);}  
+\NormalTok{        sem\_wait}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex }\OperatorTok{);}       
+
+        \DataTypeTok{item\_t}\NormalTok{ item }\OperatorTok{=}\NormalTok{ vector}\OperatorTok{.}\NormalTok{back}\OperatorTok{();}
+\NormalTok{        vector}\OperatorTok{.}\NormalTok{pop\_back}\OperatorTok{();}
+
+\NormalTok{        sem\_post}\OperatorTok{(} \OperatorTok{\&}\NormalTok{mutex }\OperatorTok{);}       
+\NormalTok{        sem\_post}\OperatorTok{(} \OperatorTok{\&}\NormalTok{empty\_count }\OperatorTok{);} 
+
+\NormalTok{        consume\_item}\OperatorTok{(}\NormalTok{item}\OperatorTok{);}
+    \OperatorTok{\}}
+
+    \CommentTok{// ...}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  \textbf{Semáforo} que se encarga de la exclusión mutua. Se inicializa
+  a 1, para que el primer hilo que use \{linux\_sem\_wait\} pueda
+  entrar.
+\item
+  \textbf{Semáforo} que se encarga de contar huecos ocupados en el
+  vector. Se inicializa a 0, porque al principio no hay ningún elemento.
+\item
+  \textbf{Semáforo} que se encarga de contar los huecos libres en el
+  vector. Se inicializa a VECTOR\_SIZE, porque están todos vacíos.
+\item
+  El segundo argumento de \{linux\_sem\_init\} es \texttt{pshared}. Se
+  pone a 0 para indicar que este \textbf{semaforo} no se va a compartir
+  entre procesos diferentes.
+\item
+  Antes de insertar un elemento se decrementa \texttt{empty\_count}.
+  Así, si vale 0, es que el vector está lleno y el productor se bloquea.
+  El consumidor incrementa \texttt{empty\_count} tras extraer un
+  elemento y dejar hueco, despertando al productor.
+\item
+  Antes de extraer un elemento se decrementa \texttt{fill\_count}. Así,
+  si vale 0, es que el vector está vacío y el consumidor se bloquea. El
+  productor incrementa \texttt{fill\_count} tras insertar un elemento
+  nuevo, despertando al consumidor.
+\item
+  El acceso al vector con los elementos es en \textbf{exclusión mutua},
+  así que tanto productor como consumidor deben usar
+  \{linux\_sem\_wait\} sobre \texttt{mutex} antes de acceder a él. Esto
+  decrementa el semáforo, así que solo uno de los dos pasa y ejecuta las
+  líneas siguientes, mientras el otro queda bloqueado. Cuando el que
+  haya pasado termine, debe usar \{linux\_sem\_post\} sobre
+  \texttt{mutex} para incrementar el semáforo y permitir que el otro
+  hilo entre en su \textbf{sección crítica}.
+\end{itemize}
+
+\section{Mutex}\label{_mutex}
+
+Los \textbf{\emph{{}mutex}} ---término que tiene su origen en
+\emph{mutual exclusion}--- son un tipo de objeto del sistema operativo
+que permite controlar el acceso a una sección crítica, de forma que
+\textbf{solo un hilo pueda ejecutarla al mismo tiempo}.
+
+En este sentido, los \textbf{\emph{mutex}} se comportan como semáforos
+inicializados a 1, motivo por el que también se denominan
+\textbf{semáforos binarios}{}. Por tanto, aunque un sistema o lenguaje
+solo soporte \textbf{semáforos}, es directo usarlos para implementar
+\textbf{\emph{mutex}}.
+
+El estándar POSIX soporta \textbf{\emph{mutex}} a través de
+\{pthreads\}. Por defecto solo se pueden utilizar para sincronizar hilos
+del mismo proceso; pero tienen un atributo para permitir la
+sincronización entre procesos diferentes, aunque para eso deben ser
+creados en una región de memoria compartida por dichos procesos.
+
+La API de \{pthreads\} no soporta \textbf{semáforos} porque, como vimos
+antes, ya eran parte del estándar POSIX.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}@{}}
+\caption{Funciones de la API para manipular
+\emph{mutex}.}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+C++
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} &
+\multicolumn{2}{>{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.4000} + 2\tabcolsep}@{}}{\begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+C++
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} &
+\multicolumn{2}{>{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.4000} + 2\tabcolsep}@{}}{\begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Crear} & \{cpp\_mutex\} & \{pthread\_mutex\_init\} &
+\{win32\_initializecriticalsection\} & \{win32\_createmutex\} \\
+\textbf{Abrir} & & & & \{win32\_openmutex\} \\
+\textbf{Operación acquire} & \{cpp\_mutex\_lock\} &
+\{pthread\_mutex\_lock\} & \{win32\_entercriticalsection\} &
+\{win32\_waitforsingleobject\} \\
+\textbf{Operación release} & \{cpp\_mutex\_unlock\} &
+\{pthread\_mutex\_unlock\} & \{win32\_leavecriticalsection\} &
+\{win32\_releasemutex\} \\
+\textbf{Destruir} & {{[}Destructor{]}} & \{pthread\_mutex\_destroy\} &
+\{win32\_deletecriticalsection\} & \{win32\_closehandle\} \\
+\end{longtable}
+
+En Windows API hay dos tipo de objetos equiparables a los
+\textbf{\emph{mutex}}: los \textbf{\emph{mutex}} y las \textbf{secciones
+críticas}. Las \textbf{secciones críticas} son más ligeras, pero solo se
+pueden utilizar para sincronizar hilos del mismo proceso. Mientras que
+los \textbf{\emph{mutex}} de Windows API son objetos más costosos, pero
+se pueden compartir entre procesos sin utilizar memoria compartida; ya
+sea mediante herencia al crear un proceso hijo o asignando un nombre al
+\textbf{\emph{mutex}}, como ocurre con los \textbf{semáforos}.
+
+\subsection{Ejemplos del uso de mutex}\label{_ejemplos_del_uso_de_mutex}
+
+En \{pthreads\_sync\_factorial\_cpp\} se puede estudiar el código
+completo de un ejemplo similar a \{pthreads\_cpp\}, donde se calculaba
+el factorial de un número, repartiendo la tarea entre dos hilos, usando
+la API de \{pthreads\}. La diferencia es que ahora los hilos no retornan
+el resultado, sino que cada uno lo mete en un vector compartido. Al
+terminar, el hilo principal recorre el vector multiplicando los
+resultados parciales.
+
+Como ahora ambos hilos acceden a una estructura de datos compartida,
+esta debe ir protegida por un \textbf{\emph{mutex}}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{pthread\_mutex\_t}\NormalTok{ mutex}\OperatorTok{;}
+\BuiltInTok{std::}\NormalTok{vector}\OperatorTok{\textless{}}\NormalTok{BigInt}\OperatorTok{\textgreater{}}\NormalTok{ partials}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+Antes de meter un nuevo valor, cada hilo debe adquirir el
+\texttt{mutex}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{// Bloquear el mutex y guardar el resultado}
+\NormalTok{pthread\_mutex\_lock}\OperatorTok{(}\NormalTok{ mutex }\OperatorTok{);}   
+\NormalTok{partials}\OperatorTok{.}\NormalTok{push\_back}\OperatorTok{(}\NormalTok{ result }\OperatorTok{);}
+\NormalTok{pthread\_mutex\_unlock}\OperatorTok{(}\NormalTok{ mutex }\OperatorTok{);} 
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Adquirir \texttt{mutex} antes de entrar en la \textbf{sección
+  crítica}.
+\item
+  Liberar \texttt{mutex} para salir de la \textbf{sección crítica}. Es
+  importante no olvidarnos de liberar el \textbf{\emph{mutex}} al
+  terminar o de lo contrario uno de los hilos quedará dormido
+  indefinidamente, al no poder entrar en la \textbf{sección crítica}.
+\end{itemize}
+
+En \{pthreads\_sync\_counter\_cpp\} se puede observar un ejemplo más
+simple donde dos hilos intentan incrementar un contador. El resultado es
+correcto siempre que cada hilo adquiera el mismo \textbf{\emph{mutex}}
+antes del incremento:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{// Bloquear el mutex antes de incrementar el contador.}
+\NormalTok{pthread\_mutex\_lock}\OperatorTok{(} \OperatorTok{\&}\NormalTok{args}\OperatorTok{{-}\textgreater{}}\NormalTok{mutex }\OperatorTok{);}
+\NormalTok{args}\OperatorTok{{-}\textgreater{}}\NormalTok{counter}\OperatorTok{++;}
+\CommentTok{// Desbloquear el mutex tras incrementar el contador.}
+\NormalTok{pthread\_mutex\_unlock}\OperatorTok{(} \OperatorTok{\&}\NormalTok{args}\OperatorTok{{-}\textgreater{}}\NormalTok{mutex }\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+En \{threads\_sync\_counter\_cpp\} y \{threads\_sync\_factorial\_cpp\}
+se puede ver ejemplos equivalentes pero usando \{cpp\_thread\} y
+\{cpp\_mutex\}, de la librería estándar de C++.
+
+\section{Variables de condición}\label{_variables_de_condiciuxf3n}
+
+{} En la solución que dimos al \textbf{problema del
+productor-consumidor} usando \textbf{semáforos} (véase el
+\hyperref[_ejemplos_del_uso_de_semuxe1foros]{Ejemplos del uso de
+semáforos}) empleamos \textbf{semáforos} para implementar las esperas
+del productor y el consumidor cuando el vector está lleno o vacío,
+respectivamente. Lamentablemente, los \emph{mutex} no se pueden usar de
+la misma manera para señalar eventos. En su lugar necesitamos otro tipo
+de objeto llamado \textbf{variable de condición}.
+
+Las \textbf{variables de condición} soportan tres primitivas
+principales:
+
+\begin{description}
+\item[wait( mutex )]
+Es llamada por un hilo que desea esperar a que ocurra el evento que
+representa la variable de condición. El hilo debe haber adquirido antes
+el \textbf{\emph{mutex}}, es liberado en el momento de poner al hilo en
+estado \textbf{esperando}. Varios hilos pueden llamar a \textbf{wait}
+sobre la misma variable de condición, a la espera de que alguno use
+\textbf{notify}.
+\item[notify]
+Es llamada por un hilo que quiere notificar el suceso de un evento a los
+hilos que esperan en la variable de condición. Uno de esos hilos es
+despertado, adquiere el \textbf{\emph{mutex}} que liberó al llamar a
+\textbf{wait} y, finalmente, retorna de \textbf{wait} para seguir
+ejecutándose.
+\item[notifyAll]
+Es llamada por un hilo que quiere notificar el suceso de un evento a los
+hilos que esperan en la variable de condición. Todos los hilos son
+despertados e intentan adquirir el \textbf{\emph{mutex}} que liberaron
+al llamar a \textbf{wait}. Cuando lo consiguen, retornan de
+\textbf{wait} para seguir ejecutándose. Obviamente, si todos hicieron
+\textbf{wait} sobre el mismo \textbf{\emph{mutex}}, irán retornando de
+\textbf{wait} de uno en uno, porque solo un hilo puede tener el
+\textbf{\emph{mutex}} al mismo tiempo.
+\end{description}
+
+Tanto Windows API como el estándar POSIX, a través de \{pthreads\},
+soportan \textbf{variables de condición}.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\caption{Funciones de la API para manipular variables de
+condición.}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+C++
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+C++
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Crear} & \{cpp\_condition\_variable\} & \{pthread\_cond\_init\}
+& \{win32\_initializeconditionvariable\} \\
+\textbf{Operación wait} & \{cpp\_condition\_variable\_wait\} &
+\{pthread\_cond\_wait\} & \{win32\_sleepconditionvariablecs\} \\
+\textbf{Operación notify} & \{cpp\_condition\_variable\_notify\_one\} &
+\{pthread\_cond\_signal\} & \{win32\_wakeconditionvariable\} \\
+\textbf{Operación notifyAll} & \{cpp\_condition\_variable\_notify\_all\}
+& \{pthread\_cond\_broadcast\} & \{win32\_wakeallconditionvariable\} \\
+\textbf{Destruir} & {{[}Destructor{]}} & \{pthread\_cond\_destroy\} & \\
+\end{longtable}
+
+Por defecto, las \textbf{variables de condición} de \{pthreads\} solo se
+pueden utilizar para sincronizar hilos del mismo proceso; pero tienen un
+atributo para permitir la sincronización entre procesos diferentes.
+Obviamente, para eso deben ser creadas en una región de memoria
+compartida por dichos procesos.
+
+Las \textbf{variables de condición} de Windows API solo se pueden
+utilizar en hilos del mismo procesos. Como alternativa, Windows API
+soporta \textbf{eventos}, que son un tipo de objeto similar a las
+\textbf{variables de condición}, pero que sí se puede utilizar entre
+hilos de procesos diferentes\hyperref[Win32-EventObjects]{???}.
+
+A los \textbf{eventos} se les puede asignar un nombre, para que sean
+accesibles por otros procesos, o heredarse de padres a hijos. Además son
+más pesados que las \textbf{variables de condición} de Windows API, no
+exigen un \textbf{\emph{mutex}} para liberar al invocar su operación
+\textbf{wait}, ni admiten la operación \textbf{notifyAll}.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\caption{Funciones de la API para manipular eventos de Windows
+API.}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Crear} & \{win32\_createevent\} \\
+\textbf{Abrir} & \{win32\_openevent\} \\
+\textbf{Operación wait} & \{win32\_waitforsingleobject\} \\
+\textbf{Operación notify} & \{win32\_setevent\} \\
+\textbf{Resetear evento} & \{win32\_resetevent\} \\
+\textbf{Destruir} & \{win32\_closehandle\} \\
+\end{longtable}
+
+\subsection{Ejemplos del uso de variables de
+condición}\label{_ejemplos_del_uso_de_variables_de_condiciuxf3n}
+
+Vamos a intentar resolver el \textbf{problema del productor-consumidor}
+sin usar \textbf{semáforos}. Para lo que, nuevamente, tenemos que
+considerar que:
+
+\begin{itemize}
+\item
+  Necesitamos \textbf{exclusión mutua} entre ambos hilos al insertar y
+  extraer elementos del vector para evitar \textbf{condiciones de
+  carrera}, por tanto usamos un \textbf{\emph{mutex}} para proteger la
+  \textbf{sección crítica}.
+\item
+  Necesitamos una forma de que el productor espere cuando el vector está
+  lleno y que el consumidor haga lo mismo cuando el vector está vacío.
+  Para señalar estos eventos necesitamos dos \textbf{variables de
+  condición}:
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\BuiltInTok{std::}\NormalTok{mutext mutex}\OperatorTok{;}                
+\BuiltInTok{std::}\NormalTok{condition\_variable no\_full}\OperatorTok{;}  
+\BuiltInTok{std::}\NormalTok{condition\_variable no\_empty}\OperatorTok{;} 
+
+\BuiltInTok{std::}\NormalTok{vector}\OperatorTok{\textless{}}\DataTypeTok{item\_t}\OperatorTok{\textgreater{}}\NormalTok{ buffer}\OperatorTok{(}\NormalTok{ VECTOR\_SIZE }\OperatorTok{);}
+
+\DataTypeTok{void}\NormalTok{ productor}\OperatorTok{()}
+\OperatorTok{\{}
+    \CommentTok{// ...}
+
+    \ControlFlowTok{while}\OperatorTok{(}\CommentTok{/* ... */}\OperatorTok{)}
+    \OperatorTok{\{}
+        \DataTypeTok{item\_t}\NormalTok{ item }\OperatorTok{=}\NormalTok{ produce\_item}\OperatorTok{();}
+
+        \BuiltInTok{std::}\NormalTok{unique\_lock lock}\OperatorTok{\{}\NormalTok{ mutex }\OperatorTok{\};}        
+
+        \ControlFlowTok{while}\OperatorTok{(}\NormalTok{ buffer}\OperatorTok{.}\NormalTok{size}\OperatorTok{()} \OperatorTok{==}\NormalTok{ VECTOR\_SIZE }\OperatorTok{)}  
+        \OperatorTok{\{}
+\NormalTok{            no\_full}\OperatorTok{.}\NormalTok{wait}\OperatorTok{(}\NormalTok{ mutex }\OperatorTok{);}            
+        \OperatorTok{\}}
+
+\NormalTok{        vector}\OperatorTok{.}\NormalTok{push\_back}\OperatorTok{(}\NormalTok{ item }\OperatorTok{);}             
+
+\NormalTok{        no\_empty}\OperatorTok{.}\NormalTok{notify\_one}\OperatorTok{();}                
+    \OperatorTok{\}}                                         
+
+    \CommentTok{// ...}
+\OperatorTok{\}}
+
+\DataTypeTok{void}\NormalTok{ consumer}\OperatorTok{()}
+\OperatorTok{\{}
+    \CommentTok{// ...}
+
+    \ControlFlowTok{while}\OperatorTok{(}\CommentTok{/* ... */}\OperatorTok{)}
+    \OperatorTok{\{}
+        \BuiltInTok{std::}\NormalTok{unique\_lock lock}\OperatorTok{\{}\NormalTok{ mutex }\OperatorTok{\};}  
+
+        \ControlFlowTok{while}\OperatorTok{(}\NormalTok{ buffer}\OperatorTok{.}\NormalTok{size}\OperatorTok{()} \OperatorTok{==} \DecValTok{0} \OperatorTok{)}      
+        \OperatorTok{\{}
+\NormalTok{            no\_empty}\OperatorTok{.}\NormalTok{wait}\OperatorTok{(}\NormalTok{ mutex }\OperatorTok{);}     
+        \OperatorTok{\}}
+
+        \DataTypeTok{item\_t}\NormalTok{ item }\OperatorTok{=}\NormalTok{ vector}\OperatorTok{.}\NormalTok{back}\OperatorTok{();}    
+\NormalTok{        vector}\OperatorTok{.}\NormalTok{pop\_back}\OperatorTok{();}
+
+\NormalTok{        no\_full}\OperatorTok{.}\NormalTok{notify\_one}\OperatorTok{();}           
+
+\NormalTok{        consume\_item}\OperatorTok{(}\NormalTok{item}\OperatorTok{);}
+    \OperatorTok{\}}                                   
+
+    \CommentTok{// ...}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  \textbf{\emph{Mutex}} que se encarga de la exclusión mutua.
+\item
+  \textbf{Variable de condición} que se encarga de indicar cuando el
+  vector no está lleno.
+\item
+  \textbf{Variable de condición} que se encarga de indicar cuando el
+  vector no está vacío.
+\item
+  Antes de acceder al vector es necesario bloquear \texttt{mutex}. Ni
+  siquiera es seguro preguntar por el número de elementos guardados en
+  \texttt{vector} sin antes adquirir el \textbf{\emph{mutex}}, puesto
+  que el otro hilo puede estar modificando \texttt{vector} al mismo
+  tiempo.
+\item
+  Los \textbf{\emph{mutex}} se pueden adquirir y liberar con
+  \{cpp\_mutex\_lock\} y cpp\_mutex\_unlock\}, pero esa no es la forma
+  recomendada. Lo recomendado es crear alguno de los objetos \emph{lock}
+  incluidos en la librería estándar. Estos objetos bloquean el
+  \textbf{\emph{mutex}} al crearse y lo desbloquean automáticamente al
+  destruirse. Así es complicado que nos olvidemos de desbloquearlo al
+  salir de la función.
+\item
+  Antes de insertar un elemento se comprueba si hay algún hueco
+  disponible. Si no lo hay, se pone el hilo a la espera en la
+  \textbf{variable de condición} \texttt{no\_full}.
+\item
+  El consumidor despierta al productor de esa espera tras extraer un
+  elemento, porque es seguro que al hacerlo habrá dejado un hueco.
+\item
+  Antes de extraer un elemento se comprueba si hay alguno en el vector.
+  Si no lo hay, se pone el hilo a la espera en la \textbf{variable de
+  condición} \texttt{no\_empty}.
+\item
+  El productor despierta al consumidor de esta espera tras insertar un
+  nuevo elemento.
+\item
+  El estándar de C++ indica que las esperas en las \textbf{variables de
+  condición} son susceptibles de despertar de forma espuria. Es decir,
+  que el hilo puede salir de \{cpp\_condition\_variable\_wait\} sin que
+  haya habido notificación. Por eso hay que volver a comprobar la
+  condición antes de continuar ejecutando sentencias en la
+  \textbf{sección crítica}.
+\item
+  Cuando los hilos se bloquean en \{cpp\_condition\_variable\_wait\},
+  \texttt{mutex} es liberado para que el otro hilo pueda entrar y
+  extraer o insertar un elemento. De lo contrario, no podría hacerlo y
+  ambos se quedarían bloqueados indefinidamente ---en una situación que
+  se denomina \textbf{{}interbloqueo} o \textbf{\emph{deadlock}}---.
+  Pero antes de salir de \{cpp\_condition\_variable\_wait\}, el hilo
+  adquiere de nuevo el \texttt{mutex}. Así que el código que inserta y
+  extrae elementos se ejecuta en \textbf{exclusión mutua}, tal y como
+  nos interesa.
+\end{itemize}
+
+\section{Implementación de
+semáforos}\label{_implementaciuxf3n_de_semuxe1foros}
+
+Como hemos visto, tanto los \textbf{\emph{mutex}} como las
+\textbf{variables de condición} son casos particulares de los
+\textbf{semáforos}. De igual forma, si un sistema o lenguaje soporta
+\textbf{\emph{mutex}} y \textbf{variables de condición}, es muy sencillo
+implementar \textbf{semáforos}, así como otras primitivas de
+sincronización.
+
+Un \textbf{semáforo} se implementa de forma muy parecida a la solución
+anterior al \textbf{problema del productor-consumidor} (véase el
+\hyperref[_ejemplos_del_uso_de_variables_de_condiciuxf3n]{Ejemplos del
+uso de variables de condición}), solo que eliminando lo relacionado con
+el vector de elementos.
+
+El código fuente completo de la clase \texttt{semaphore} está disponible
+en \{semaphore\_hpp\}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{class}\NormalTok{ semaphore }\OperatorTok{\{}
+\KeywordTok{public}\OperatorTok{:}
+
+\NormalTok{    semaphore}\OperatorTok{(}\DataTypeTok{int}\NormalTok{ count }\OperatorTok{=} \DecValTok{0}\OperatorTok{)} \OperatorTok{:} \VariableTok{count\_}\OperatorTok{(}\NormalTok{count}\OperatorTok{)} \OperatorTok{\{\}}
+
+    \DataTypeTok{void}\NormalTok{ release}\OperatorTok{()} \OperatorTok{\{}
+        \BuiltInTok{std::}\NormalTok{unique\_lock}\OperatorTok{\textless{}}\BuiltInTok{std::}\NormalTok{mutex}\OperatorTok{\textgreater{}}\NormalTok{ lock}\OperatorTok{(}\VariableTok{mutex\_}\OperatorTok{);} 
+        \VariableTok{count\_}\OperatorTok{++;}
+        \VariableTok{cv\_}\OperatorTok{.}\NormalTok{notify\_one}\OperatorTok{();}                          
+    \OperatorTok{\}}
+
+    \DataTypeTok{void}\NormalTok{ acquire}\OperatorTok{()} \OperatorTok{\{}
+        \BuiltInTok{std::}\NormalTok{unique\_lock}\OperatorTok{\textless{}}\BuiltInTok{std::}\NormalTok{mutex}\OperatorTok{\textgreater{}}\NormalTok{ lock}\OperatorTok{(}\VariableTok{mutex\_}\OperatorTok{);} 
+        \ControlFlowTok{while}\OperatorTok{(}\VariableTok{count\_} \OperatorTok{==} \DecValTok{0}\OperatorTok{)} \OperatorTok{\{}
+            \VariableTok{cv\_}\OperatorTok{.}\NormalTok{wait}\OperatorTok{(}\NormalTok{lock}\OperatorTok{);}                        
+        \OperatorTok{\}}
+        \VariableTok{count\_}\OperatorTok{{-}{-};}
+    \OperatorTok{\}}
+
+\KeywordTok{private}\OperatorTok{:}
+    \BuiltInTok{std::}\NormalTok{mutex }\VariableTok{mutex\_}\OperatorTok{;}
+    \BuiltInTok{std::}\NormalTok{condition\_variable }\VariableTok{cv\_}\OperatorTok{;}
+    \DataTypeTok{int} \VariableTok{count\_}\OperatorTok{;}
+\OperatorTok{\};}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  El acceso al contador \texttt{count\_} esta protegido por el
+  \textbf{\emph{mutex}} \texttt{mutex\_}.
+\item
+  En \texttt{semaphore::acquire()}, si el contador está a 0 no pueden
+  entrar más hilos, por lo que el hilo debe esperar en la
+  \textbf{variable de condición} \texttt{cv\_}.
+\item
+  Cada vez que un hilo llama a \texttt{semaphore::release()} se
+  incrementa el contador y se despierta uno de los hilos a la espera en
+  \texttt{cv\_}.
+\end{itemize}
+
+En \{threads\_sync\_semaphore\_cpp\} se puede ver un ejemplo de cómo
+utilizarla para limitar el número de hilos que pueden ejecutarse en una
+\textbf{sección crítica} al mismo tiempo.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{void}\NormalTok{ thread\_function}\OperatorTok{(}\NormalTok{semaphore}\OperatorTok{\&}\NormalTok{ sem}\OperatorTok{,} \DataTypeTok{int}\NormalTok{ thread\_id}\OperatorTok{)}
+\OperatorTok{\{}
+\NormalTok{    sem}\OperatorTok{.}\NormalTok{acquire}\OperatorTok{();} 
+    \BuiltInTok{std::}\NormalTok{println}\OperatorTok{(} \StringTok{"Hilo }\SpecialCharTok{\{\}}\StringTok{ creado"}\OperatorTok{,}\NormalTok{ thread\_id }\OperatorTok{);}
+
+    \CommentTok{// Dormir el hilo para simular trabajo}
+    \CommentTok{// ...}
+
+    \BuiltInTok{std::}\NormalTok{println}\OperatorTok{(} \StringTok{"Hilo }\SpecialCharTok{\{\}}\StringTok{ terminado"}\OperatorTok{,}\NormalTok{ thread\_id }\OperatorTok{);}
+\NormalTok{    sem}\OperatorTok{.}\NormalTok{release}\OperatorTok{();} 
+\OperatorTok{\}}
+
+\DataTypeTok{int}\NormalTok{ main}\OperatorTok{()}
+\OperatorTok{\{}
+    \AttributeTok{const} \DataTypeTok{int}\NormalTok{ num\_threads }\OperatorTok{=} \DecValTok{10}\OperatorTok{;}
+\NormalTok{    semaphore sem}\OperatorTok{(}\DecValTok{3}\OperatorTok{);} 
+
+    \BuiltInTok{std::}\NormalTok{vector}\OperatorTok{\textless{}}\BuiltInTok{std::}\NormalTok{thread}\OperatorTok{\textgreater{}}\NormalTok{ threads}\OperatorTok{;}
+    \ControlFlowTok{for}\OperatorTok{(}\DataTypeTok{int}\NormalTok{ i }\OperatorTok{=} \DecValTok{0}\OperatorTok{;}\NormalTok{ i }\OperatorTok{\textless{}}\NormalTok{ num\_threads}\OperatorTok{;}\NormalTok{ i}\OperatorTok{++)} 
+    \OperatorTok{\{}
+\NormalTok{        threads}\OperatorTok{.}\NormalTok{push\_back}\OperatorTok{(} \BuiltInTok{std::}\NormalTok{thread}\OperatorTok{(}\NormalTok{ thread\_function}\OperatorTok{,} \BuiltInTok{std::}\NormalTok{ref}\OperatorTok{(}\NormalTok{sem}\OperatorTok{),}\NormalTok{ i }\OperatorTok{));}
+    \OperatorTok{\}}
+
+    \ControlFlowTok{for}\OperatorTok{(}\KeywordTok{auto}\OperatorTok{\&}\NormalTok{ t }\OperatorTok{:}\NormalTok{ threads}\OperatorTok{)}
+    \OperatorTok{\{}
+\NormalTok{        t}\OperatorTok{.}\NormalTok{join}\OperatorTok{();}
+    \OperatorTok{\}}
+
+    \ControlFlowTok{return}\NormalTok{ EXIT\_SUCCESS}\OperatorTok{;}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Solo se van a permitir 3 hilos simultáneos.
+\item
+  Se crean 10 hilos y se guardan en un vector los objetos
+  \{cpp\_thread\} para luego poder esperar por ellos usando
+  \{cpp\_thread\_join\}, antes de terminar el programa.
+\item
+  Se llama a \texttt{semaphore::acquire()} antes de entrar en la
+  \textbf{sección crítica}. Si hay más de 3 hilos en ella, el hilo es
+  suspendido en la \textbf{variable de condición} \texttt{cv\_} de
+  \texttt{semaphore}.
+\item
+  Se llama a \texttt{semaphore::release()} al salir de la
+  \textbf{sección critica}. Esto hace que la \textbf{variable de
+  condición} \texttt{cv\_} de \texttt{semaphore} despierte a uno de los
+  hilos que está esperando en \texttt{semaphore::acquire()} para que
+  entre en la \textbf{sección crítica}.
+\end{itemize}
+
+\section{Esperas}\label{_esperas}
+
+Muchos de los objetos de sincronización que hemos visto necesitan algún
+mecanismo para poner en espera a los hilos que los usan. Existen dos
+alternativas desde el punto de vista de cómo implementar esta espera:
+
+\begin{itemize}
+\item
+  El sistema operativo puede cambiar el estado del hilo o proceso a
+  \textbf{esperado} y moverlo a una cola de espera asociada al objeto de
+  sincronización, tal y como hemos comentado en varias ocasiones.
+  Entonces el planificador de la CPU escogerá a otro proceso para ser
+  ejecutado.
+\item
+  El hilo puede iterar comprobando constantemente la condición hasta que
+  se cumple. A esa técnica se la denomina \textbf{espera ocupada}{}.
+\end{itemize}
+
+Este tipo de \textbf{espera ocupada} desperdicia tiempo de CPU que otro
+hilo podría utilizar de forma más productiva, por lo que solo se utiliza
+en el caso de esperas previsiblemente cortas. Para evitar que las
+esperas ocupadas sean demasiado largas, los sistemas operativos nunca
+expulsan de la CPU a hilos que se estén ejecutando dentro de secciones
+críticas controladas por objetos de sincronización con este tipo de
+espera, con la idea de que salgan de la sección crítica lo antes
+posible.
+
+En Windows API, por ejemplo, se puede utilizar
+\{win32\_initializecriticalsectionandspincount\} para inicializar un
+objeto de \textbf{sección crítica} donde el hilo que la intenta adquirir
+itera el número especificado de veces en una \textbf{espera ocupada},
+comprobando si la sección es liberada, antes de bloquearse en el estado
+\textbf{esperando} si eso no ocurre.
+
+La \textbf{espera ocupada} de estos objetos \textbf{sección crítica} de
+Windows API solo ocurre en sistemas multiprocesador, donde el hilo que
+tiene adquirida la sección puede estar ejecutándose en otro hilo y
+terminar rápidamente. En sistemas monoprocesador nunca hay
+\textbf{espera ocupada}.
+
+A los \textbf{\emph{mutex}} con \textbf{espera ocupada} también se los
+denomina \textbf{\emph{{}spinlock}}. Los \textbf{\emph{spinlocks}} son
+utilizados frecuentemente para proteger las estructuras del núcleo en
+los sistemas multiprocesador, cuando la tarea a realizar dentro de la
+sección crítica en el núcleo requiere poco tiempo y los diseñadores
+calculan que se desperdicia más tiempo sacando de la CPU al hilo en
+espera para ejecutar otro en su lugar.
+
+\section{Funciones reentrantes y seguras en
+hilos}\label{_funciones_reentrantes_y_seguras_en_hilos}
+
+Todas estas cuestiones sobre la sincronización no solo afectan al código
+que escribimos sino también a las librerías que podemos utilizar. A la
+hora de decidir utilizar una librería en un programa multihilo es
+necesario que tengamos en cuenta los conceptos de \textbf{reentrante} y
+\textbf{seguridad de hilos}.
+
+\subsection{Funciones reentrantes}\label{_funciones_reentrantes}
+
+{} {} Una función es \textbf{reentrante} puede ser interrumpida en medio
+de su ejecución y, mientras espera, volver a ser llamada con total
+seguridad. Obviamente las funciones recursivas deben ser reentrantes
+para poder llamarse a sí mismas una y otra vez con seguridad.
+
+En el contexto de la programación multihilo, ocurre una reentrada cuando
+durante la ejecución de una función por parte de un hilo, este es
+interrumpido por el sistema operativo para planificar posteriormente a
+otro del mismo proceso que invoca la misma función.
+
+En general una función es reentrante, si:
+
+\begin{itemize}
+\item
+  No modifica variables estáticas o globales. Si lo hiciera solo puede
+  hacerlo mediante operaciones \textbf{leer-modificar-escribir} que sean
+  ininterrumpibles ---es decir, atómicas---.
+\item
+  No modifica su propio código y no llama a otras funciones que no sean
+  reentrantes.
+\end{itemize}
+
+Como hemos mencionado anteriormente, los \textbf{manejadores de señal}
+deben ser funciones \textbf{reentrantes}.
+
+\subsection{Seguridad en hilos}\label{_seguridad_en_hilos}
+
+{} {} Una función es \textbf{segura en hilos} o \textbf{{}thread-safe}
+si al manipular estructuras compartidas de datos lo hace de tal manera
+que se garantiza la ejecución segura de la misma por múltiples hilos al
+mismo tiempo. Obviamente estamos hablando de un problema de secciones
+críticas, por lo que las funciones lo resuelven sincronizando el acceso
+a estos datos mediante el uso de \textbf{semáforos},
+\textbf{\emph{mutex}} u otros recursos similares ofrecidos por el
+sistema operativo.
+
+En ocasiones, ambos conceptos se confunden porque es bastante común que
+el código reentrante también sea seguro en hilos. Sin embargo es posible
+crear código reentrante que no sea seguro en hilos y viceversa.
+
+A la hora de usar una función o librería que va a ser llamada desde
+múltiples hilos, primero debemos consultar la documentación para
+averiguar si es \textbf{segura en hilos}. Si no lo fuera, tendríamos que
+buscar funciones alternativas o recordar proteger las llamadas a las
+funciones no seguras con mecanismos de sincronización, para asegurar que
+solo son invocadas desde un hilo al mismo tiempo.
+
+Esto se aplica tanto a librerías de otros desarrolladores como a la
+librería estándar del lenguaje que estemos usando y a la librería del
+sistema.
+
+\subsubsection{Seguridad en hilos en
+C++}\label{_seguridad_en_hilos_en_c}
+
+La norma general es que las clases de la librería estándar de C++ son
+seguras frente a múltiples accesos de lectura desde diferentes hilos.
+Pero si un hilo modifica un objeto, todas las lecturas y escrituras en
+el mismo objeto por ese y otros hilos deben estar protegidas.
+
+Obviamente, las clases de mecanismos de sincronización y gestión de
+hilos generalmente ofrecen mayores garantías, para lo que hay que
+consultar la documentación.
+
+\subsubsection{Seguridad en hilos en
+C}\label{_seguridad_en_hilos_en_c_2}
+
+El estándar de C no menciona nada sobre \textbf{seguridad en hilos}, por
+lo que se debe suponer que las funciones de la librería estándar no lo
+son o consultar la documentación ofrecida por el proveedor de la
+librería.
+
+Por ejemplo, todas las versiones de la librería estándar de C en Windows
+actualmente son \textbf{seguras en
+hilos}\hyperref[Microsoft-MultithreadingWithC]{???}. Pero hasta hace
+unos años Microsoft ofrecía varias versiones de la librería, algunas
+\textbf{seguras en hilos}, para usar en aplicaciones multihilo, y otras
+no seguras para usar en aplicaciones monohilo.
+
+\subsubsection{Seguridad en hilos en
+POSIX}\label{_seguridad_en_hilos_en_posix}
+
+La API POSIX es un superconjunto de la API de la librería estándar de C.
+Por lo que en esos sistemas el estándar POSIX es el que marca qué
+funciones de la librería estándar de C y del resto de la API POSIX son
+\textbf{seguras en hilos}.
+
+En los sistemas POSIX, el estándar establece que todas las funciones son
+seguras excepto algunas muy concretas, que se pueden consultar en el
+apartado
+\href{https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html\#tag_15_09_01}{«2.9.1
+Thread-Safety»} de la especificación. Muchas de esas funciones no se
+especifican como \textbf{seguras en hilos} porque existe alguna
+alternativa que sí lo es. Por ejemplo, \{linux\_strerror\} no es
+\textbf{segura en hilos}, pero \{linux\_strerror\_r\} tiene una
+funcionalidad equivalente y sí lo es.

@@ -1,0 +1,439 @@
+\section{}
+
+\textbf{Tiempo de lectura:} \{s04-reading-time\}
+
+Crear un software tan complejo como un sistema operativo no es sencillo,
+por ello resulta más práctico dividirlo en piezas más pequeñas
+especializadas en aspectos concretos de la gestión del sistema.
+
+Cada sistema operativo tiene diferentes componentes con distinto nombre.
+Lo que veremos en este capítulo es un esquema de los más comunes a la
+mayoría de sistemas operativos actuales.
+
+\section{Gestión de
+procesos}\label{sect-componente-gestiuxf3n-de-procesos}
+
+{} La gestión de los procesos es un elemento central de todo sistema
+operativo:
+
+\begin{itemize}
+\item
+  El \textbf{{}proceso} es la unidad de trabajo en cualquier sistema
+  operativo moderno. Es quién realiza las tareas que interesan a los
+  usuarios. Por eso, es a cada proceso al que se le asigna el tiempo de
+  CPU y el resto de recursos del sistema, como por ejemplo: memoria,
+  archivos o dispositivos de E/S abiertos.
+\item
+  Un \textbf{proceso} es un programa en ejecución. Un programa se
+  convierte en proceso cuando las instrucciones del programa son
+  cargadas en la memoria desde el archivo del ejecutable y se le asignan
+  recursos para su ejecución.
+\end{itemize}
+
+Los procesos son entidades activas que necesitan recursos ---CPU,
+memoria, archivos, dispositivos E/S---. Algunos de esos recursos se
+asignan durante su creación, mientras que otros son solicitados por el
+proceso durante su ejecución ---por ejemplo la memoria, de la que todo
+proceso necesita cierta cantidad para comenzar, pero que luego puede
+pedir más dinámicamente durante su ejecución---. Cuando el proceso
+termina el sistema operativo reclama de estos recursos aquellos que sean
+reutilizables para otros procesos.
+
+Un \textbf{programa} no es un proceso, es una entidad pasiva. Es el
+contenido de un archivo en disco con las instrucciones que algún día una
+CPU ejecutará. Un programa no puede hacer ningún tipo de trabajo a menos
+que sus instrucciones sean ejecutadas por una CPU, pero si eso ocurre,
+ya no sería un programa sino un proceso.
+
+Aunque varios procesos estén asociados al mismo programa no pueden ser
+considerados el mismo proceso. La CPU ejecuta las instrucciones de cada
+proceso una detrás de otra, de manera que para conocer la siguiente
+instrucción a ejecutar cada proceso tiene un contador de programa que se
+lo indica a la CPU, así como valores en los registros de la CPU que
+dependen de la historia pasada del proceso. Aunque varios procesos
+ejecuten el mismo programa, la secuencia de instrucciones ejecutadas y
+el estado del proceso en cada momento seguramente sean diferentes. Por
+lo tanto, no son el mismo proceso.
+
+Por el momento estamos considerando que \textbf{proceso} y
+\textbf{trabajo} hacen referencia al mismo concepto porque en los
+sistemas más antiguos (véase el \hyperref[_mainframe]{???}) la unidad de
+trabajo se llamaba \textbf{trabajo} mientras que en los sistemas
+modernos se llama \textbf{proceso}, de tal forma que podemos considerar
+al segundo una evolución del primero.
+
+Sin embargo, mirándolo exclusivamente desde la perspectiva de los
+sistemas operativos modernos, son dos conceptos diferentes aunque
+relacionados. En un sistema moderno un trabajo puede ser realizado por
+un solo proceso o mediante la colaboración de varios.
+
+\subsection{Responsabilidades de la gestión de
+procesos}\label{_responsabilidades_de_la_gestiuxf3n_de_procesos}
+
+El componente de gestión de procesos es el responsable de las siguientes
+actividades:
+
+\begin{itemize}
+\item
+  Crear y terminar procesos.
+\item
+  Suspender y reanudar los procesos.
+\item
+  Proporcionar mecanismos para la sincronización de procesos.
+\item
+  Proporcionar mecanismos para la comunicación entre procesos.
+\item
+  Proporcionar mecanismos para el tratamiento de interbloqueos.
+\end{itemize}
+
+\section{Gestión de la memoria
+principal}\label{_gestiuxf3n_de_la_memoria_principal}
+
+{} La memoria principal es un recurso fundamental para las operaciones
+de cualquier sistema operativo moderno. Esto es así porque generalmente
+es el único almacenamiento al que la CPU tiene acceso directo. Para que
+un programa pueda ser ejecutado debe ser copiado a la memoria principal.
+Y para que un proceso tenga acceso a datos almacenados en cualquier otro
+dispositivo de almacenamiento, primero deben ser copiados a la memoria
+principal.
+
+Para mejorar el aprovechamiento de la CPU y la respuesta al usuario es
+necesario tener en la memoria varios programas al mismo tiempo. Puesto
+que dichos programas deben compartir la memoria durante su ejecución,
+automáticamente existe la necesidad de que el sistema operativo disponga
+de un componente de gestión de la memoria principal.
+
+\subsection{Responsabilidad de la gestión de la
+memoria}\label{_responsabilidad_de_la_gestiuxf3n_de_la_memoria}
+
+El componente de gestión de la memoria debe asumir las siguientes
+responsabilidades:
+
+\begin{itemize}
+\item
+  Controlar qué partes de la memoria están actualmente en uso y cuáles
+  no.
+\item
+  Decidir que procesos ---o partes de procesos--- añadir o extraer de la
+  memoria cuando hay o falta espacio en la misma.
+\item
+  Asignar y liberar espacio de la memoria principal según sea necesario.
+\end{itemize}
+
+\section{Gestión del sistema de
+E/S}\label{_gestiuxf3n_del_sistema_de_es}
+
+{} El \textbf{sistema de E/S}{} hace de interfaz con el hardware, oculta
+las peculiaridades del hardware al resto del sistema.
+
+El sistema de E/S consta de:
+
+\begin{itemize}
+\item
+  \textbf{Un componente de gestión de memoria especializado en E/S}, con
+  soporte para servicios de \emph{buffering}, \emph{caching} y
+  \emph{spooling}. Estos servicios son utilizados por el resto del
+  sistema de E/S.
+\item
+  \textbf{Una interfaz genérica de acceso a los controladores de
+  dispositivo}. Cada dispositivo es diferente, pero los procesos y el
+  resto de componentes del sistema no deben tener necesidad de conocer
+  sus particularidades a la hora de acceder a ellos. Es decir, para
+  acceder a cualquier disco duro el sistema ofrece una misma interfaz,
+  independiente de su marca y modelo. Y lo mismo ocurre con las tarjetas
+  de sonido o con los dispositivos de entrada, como teclados y ratones.
+  Así los programadores pueden acceder a cualquier dispositivo
+  abstrayendo de las particularidades concretas del hardware instalado
+  en cada ordenador.
+\item
+  \textbf{Controladores de dispositivo}, que generalmente son
+  desarrollados por los fabricantes de los dispositivos y son el
+  componente que realmente conoce las peculiaridades específicas del
+  dispositivo. Por tanto, las peticiones que hacen los procesos a la
+  interfaz de E/S genérica la traslada el sistema a los controladores de
+  dispositivo para que estos las conviertan en acciones concretas sobre
+  el hardware del dispositivo.
+\end{itemize}
+
+Una característica de los sistemas UNIX es que todos los dispositivos de
+E/S se representan como un archivo en el sistema de archivos. Esto se
+puede comprobar rápidamente visitando el directorio \texttt{/dev} en
+cualquier sistema GNU/Linux o UNIX BSD, ya que es allí donde suelen
+estar.
+
+Así no hace falta diseñar y aprender una interfaz diferente para cada
+tipo de dispositivo. Por ejemplo, no hace falta que el sistema ofrezca
+funciones para leer y escribir bloques en dispositivos de
+almacenamiento. Ni para leer la geometría del dispositivo, para
+configurar modos de trasferencia o de ahorro de energía o para
+eyectarlo, en el caso de los dispositivos removibles. Tampoco son
+necesarias funciones específicas para grabar y reproducir sonidos, para
+configurar la tarjeta de sonido o para leer y establecer los valores del
+mezclador. Por el contrario, todas las operaciones sobre los
+dispositivos de E/S se ofrecen a través de una interfaz bien conocida
+por los desarrolladores, la misma que se utiliza para gestionar archivos
+convencionales: \{linux\_open\}, \{linux\_read\}, \{linux\_write\},
+\{linux\_close\} o \{linux\_mmap\}.
+
+Por ejemplo, \texttt{/dev/urandom} es un dispositivo que se utiliza para
+obtener una secuencia de bytes aleatorios. Para usarlo, solo tenemos que
+abrirlo y leer de él la cantidad de bytes que necesitemos:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{int}\NormalTok{ fd }\OperatorTok{=}\NormalTok{ open}\OperatorTok{(} \StringTok{"/dev/urandom"}\OperatorTok{,}\NormalTok{ O\_RDONLY }\OperatorTok{);}
+\ControlFlowTok{if} \OperatorTok{(}\NormalTok{fd }\OperatorTok{\textgreater{}=} \DecValTok{0}\OperatorTok{)} \OperatorTok{\{}
+    \DataTypeTok{char}\NormalTok{ random\_data}\OperatorTok{[}\DecValTok{64}\OperatorTok{];}
+    \DataTypeTok{ssize\_t}\NormalTok{ bytes\_read }\OperatorTok{=}\NormalTok{ read}\OperatorTok{(}\NormalTok{ fd}\OperatorTok{,}\NormalTok{ random\_data}\OperatorTok{,} \KeywordTok{sizeof}\OperatorTok{(}\NormalTok{random\_data}\OperatorTok{)} \OperatorTok{);}
+
+    \CommentTok{// ...}
+
+\NormalTok{    close}\OperatorTok{(}\NormalTok{fd}\OperatorTok{);}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Si \{linux\_read\} tiene éxito, \texttt{random\_data} contendrá datos
+  aleatorios al volver de la llamada al sistema.
+\end{itemize}
+
+Sin embargo, algunos dispositivos tienen funciones de control que no se
+trasladan bien a esta interfaz basada en archivos. Por ejemplo, si
+tenemos un lector de DVD o de Blu-ray, las operación \{linux\_read\} nos
+permite leer el contenido del disco en crudo ---es decir, bloque a
+bloque, ignorando el sistema de archivos--- pero ¿cómo lo eyectamos o
+cómo sabemos si hay un disco en el lector?.
+
+Para resolver este tipo de situaciones, los sistemas UNIX incorporan la
+llamada al sistema \{linux\_ioctl\}, que permite enviar comandos u
+obtener parámetros específicos del dispositivo. La llamada al sistema
+\{linux\_ioctl\} acepta los siguientes argumentos:
+
+\begin{itemize}
+\item
+  El descriptor de archivo obtenido al abrir el dispositivo.
+\item
+  El código de petición al dispositivo. Depende del dispositivo, por lo
+  que para conocer los códigos que se soportan es necesario leer la
+  documentación del controlador.
+\item
+  Un puntero opcional a un búfer en la memoria, para recibir los
+  parámetros solicitados o para enviar datos al dispositivo.
+\end{itemize}
+
+Por ejemplo, así podríamos eyectar el primer lector de CD/DVD-ROM o
+Blue-ray en Linux:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\PreprocessorTok{\#include }\ImportTok{\textless{}linux/cdrom.h\textgreater{}}\PreprocessorTok{                              }
+
+\CommentTok{// ...}
+
+\DataTypeTok{int}\NormalTok{ fd }\OperatorTok{=}\NormalTok{ open}\OperatorTok{(} \StringTok{"/dev/sr0"}\OperatorTok{,}\NormalTok{ O\_RDONLY }\OperatorTok{|}\NormalTok{ O\_NONBLOCK }\OperatorTok{);}
+\ControlFlowTok{if} \OperatorTok{(}\NormalTok{fd }\OperatorTok{\textgreater{}=} \DecValTok{0}\OperatorTok{)} \OperatorTok{\{}
+\NormalTok{    ioctl }\OperatorTok{(}\NormalTok{ fd}\OperatorTok{,}\NormalTok{ CDROMEJECT }\OperatorTok{);}
+\NormalTok{    close }\OperatorTok{(}\NormalTok{ fd }\OperatorTok{);}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Este archivo contiene los códigos IOCTL conocidos por los
+  controladores de dispositivo del tipo lectores de CD-ROM.
+\item
+  Como en el ejemplo anterior con \texttt{/dev/uranom}, es necesario
+  abrir el dispositivo para obtener un descriptor de archivo.
+\item
+  En la llamada al sistema \{linux\_ioctl\} se indica el código de la
+  petición para eyectar la bandeja.
+\end{itemize}
+
+\subsection{\texorpdfstring{{}Buffering}{Buffering}}\label{_bufferingbuffering}
+
+El \textbf{buffering} o uso de memoria intermedia es una estrategia en
+la que se almacenan los datos de manera temporal en una zona de la
+memoria, llamada búfer.
+
+Consiste en que el controlador indica a un dispositivo que escriba los
+bloques de datos solicitados en un búfer. Cuando la escritura del búfer
+se ha completado, se transfiere su contenido al proceso que hizo la
+solicitud para que procese los datos. Mientras lo hace, el controlador
+indica al dispositivo que copie nuevos datos en el búfer.
+
+Por ejemplo, al grabar sonido del dispositivo de sonido del sistema no
+se entregan las muestras una a una al proceso. En su lugar se graban
+varios miles de muestras que se escriben en un búfer. Cuando el búfer
+está lleno, se transfieren todas las muestras al proceso de una sola vez
+y se siguen grabando muestras en el búfer.
+
+Lo mismo ocurre al reproducir sonido. El proceso no entrega las muestras
+de sonido de una en una al dispositivo, sino que empaqueta varios miles
+que se copian al búfer de una sola vez. Entonces el controlador indica
+al dispositivo que lea las muestras desde ese búfer según lo vaya
+necesitando.
+
+\subsection{\texorpdfstring{{}Caching}{Caching}}\label{_cachingcaching}
+
+En el \textbf{caching} el sistema mantiene en la memoria principal una
+copia de datos leídos o escritos recientemente en los dispositivos de
+E/S del sistema ---por ejemplo, en los discos duros o en las memorias
+USB---. Esto mejora la eficiencia del sistema si accede con frecuencia a
+los mismos datos, puesto que el acceso a la memoria principal es más
+rápido que el acceso a los dispositivos de E/S. La memoria principal es
+de tamaño limitado, por lo que solo se mantiene copia de los datos
+utilizados con mayor frecuencia.
+
+\subsection{\texorpdfstring{{}Spooling}{Spooling}}\label{_spoolingspooling}
+
+El \textbf{spooling} se utiliza en dispositivos que no admiten el acceso
+simultáneo de varias aplicaciones a la vez, como es el caso de
+impresoras y unidades de cinta.
+
+Cuando varias aplicaciones intentan enviar un trabajo a una impresora,
+el sistema operativo lo intercepta para copiar los datos enviados a un
+archivo independiente. Cuando una aplicación termina de enviar el
+trabajo, el archivo correspondiente se mete en una cola de donde son
+extraídos los trabajos para su impresión de uno en uno. Así no hay
+acceso simultáneo al dispositivo por parte de varios procesos, mientras
+que estos pueden entregar el trabajo y continuar con su trabajo sin
+esperar a que la impresora esté disponible.
+
+\section{Gestión del almacenamiento
+secundario}\label{_gestiuxf3n_del_almacenamiento_secundario}
+
+{} Dentro de los dispositivos de E/S, los dedicados al almacenamiento
+secundario ---como discos duros, memorias USB o lectores de DVD-ROM---
+merecen un tratamiento especial.
+
+Los programas que se desean ejecutar deben estar en la memoria principal
+---o almacenamiento primario--- pero esta es demasiado pequeña para
+alojar todos los datos y todos los programas del sistema. Además,
+incluso aunque pudiera ser así, los datos almacenados en la memoria
+principal se perderían en caso de que ocurriera un fallo de
+alimentación. Por eso los ordenadores disponen de un almacenamiento
+secundario para guardar datos de forma masiva y permanente.
+
+El gestor del almacenamiento secundario utiliza el sistema de E/S para
+acceder a los dispositivos y ofrecer al sistema servicios más complejos.
+
+\subsection{Responsabilidades de la gestión del almacenamiento
+secundario}\label{_responsabilidades_de_la_gestiuxf3n_del_almacenamiento_secundario}
+
+El gestor del almacenamiento secundario es el responsable de:
+
+\begin{itemize}
+\item
+  Gestionar el espacio libre en discos duros y resto de dispositivos de
+  almacenamiento secundario.
+\item
+  Asignar el espacio de almacenamiento.
+\item
+  Planificar el acceso a los dispositivos, de tal forma que se ordenen
+  las operaciones de forma eficiente.
+\end{itemize}
+
+\section{Gestión del sistema de
+archivos}\label{_gestiuxf3n_del_sistema_de_archivos}
+
+{} Los ordenadores pueden almacenar información en diferentes tipos de
+medios físicos ---por ejemplo en discos duros magnéticos, CD/DVD-ROM,
+memorias USB o SSD--- cada uno de los cuales tiene características
+propias. El acceso a cada tipo de medio es controlado por un dispositivo
+---por ejemplo el controlador de disco o la unidad de DVD-ROM--- que
+también tiene características propias. El sistema de E/S y la gestión
+del almacenamiento secundario simplifican el acceso a estos
+dispositivos, pero no lo suficiente como para que sea cómodo usarlos
+constantemente en cualquier programa.
+
+Para simplificar aún más el acceso al almacenamiento, el sistema
+operativo proporciona una visión lógica uniforme de todos los sistemas
+de almacenamiento. Es decir, abstrae las propiedades físicas de los
+dispositivos de almacenamiento para definir el \textbf{archivo}, una
+unidad de almacenamiento lógico con la que trabajan los procesos para
+guardar y recuperar datos.
+
+Un \textbf{{}archivo} o \textbf{{}fichero} es una colección de datos
+relacionados, identificados por un nombre, que es tratada por el sistema
+operativo como la unidad de información en el almacenamiento secundario.
+
+Esto quiere decir que, por lo general, para el sistema operativo un
+archivo no es más que una colección de bytes y lo que ofrece son
+servicios para leer, escribir, identificar y manipular dicha colección.
+La organización y formato utilizados para guardar la información
+---como, por ejemplo, el detalle de cómo se codifica en un archivo una
+imagen al guardarla en formato JPEG--- y lo que se hace dicha
+información, es algo que generalmente solo incumbe a las aplicaciones,
+no al sistema operativo.
+
+Los archivos normalmente se organizan en directorios para facilitar su
+uso y organización.
+
+\subsection{Responsabilidades de la gestión del sistema de
+archivos}\label{_responsabilidades_de_la_gestiuxf3n_del_sistema_de_archivos}
+
+El sistema de archivos utiliza al gestor del almacenamiento secundario y
+al sistema de E/S y es responsable de las siguientes actividades:
+
+\begin{itemize}
+\item
+  Crear y borrar archivos.
+\item
+  Crear y borrar directorios para organizar los archivos.
+\item
+  Soportar operaciones básicas para la manipulación de archivos y
+  directorios: lectura y escritura de datos, cambio de nombre, cambio de
+  permisos, etc.
+\item
+  Mapear en memoria archivos del almacenamiento secundario.
+\item
+  Hacer copias de seguridad de los archivos en sistemas de
+  almacenamiento estables y seguros.
+\end{itemize}
+
+\section{Gestión de red}\label{_gestiuxf3n_de_red}
+
+{} El componente de red se responsabiliza de la comunicación con otros
+sistemas interconectados mediante una red de ordenadores ---por ejemplo,
+en Internet o en la red de área local de una oficina---.
+
+\section{Protección y seguridad}\label{_protecciuxf3n_y_seguridad}
+
+\textbf{Protección}{} es cualquier mecanismo para controlar el acceso de
+los procesos y usuarios a los recursos definidos por el sistema.
+
+\begin{itemize}
+\item
+  Son mecanismos necesarios cuando un sistema informático tiene
+  múltiples usuarios y permite la ejecución concurrente de varios
+  procesos, pues así solo pueden utilizar los recursos aquellos procesos
+  que hayan obtenido la autorización del sistema operativo.
+\item
+  Permite mejorar la fiabilidad, al permitir detectar los elementos del
+  sistema que no operan correctamente. Un recurso desprotegido no puede
+  defenderse contra el uso ---o mal uso--- de un usuario no autorizado o
+  incompetente.
+\end{itemize}
+
+Ejemplos típicos de mecanismos de protección son el hardware de
+direccionamiento de memoria, que se utiliza para que los procesos se
+ejecuten en su propio espacio de direcciones, y el temporizador, que
+garantiza que ningún proceso toma el control de la CPU por tiempo
+indefinido. Además, los registros de los dispositivos de E/S suelen
+estar protegidos del acceso directo de los usuarios, lo que protege la
+integridad de los dispositivos. Mientras que en algunos sistemas se
+pueden establecer permisos sobre los archivos para garantizar que solo
+los procesos con la debida autorización tengan acceso.
+
+Un sistema puede tener la protección adecuada pero estar expuesto a
+fallos y permitir accesos inapropiados. Por eso es necesario disponer de
+mecanismos de \textbf{{}seguridad} que se encarguen de defender el
+sistema frente a ataques internos y externos.
+
+Eso incluye a virus y gusanos, ataques de
+\href{https://es.wikipedia.org/wiki/Ataque_de_denegaci\%C3\%B3n_de_servicio}{denegación
+de servicio}, robo de identidad y uso no autorizado del sistema, entre
+muchos otros tipos de ataque.

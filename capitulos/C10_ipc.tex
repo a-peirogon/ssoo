@@ -1,0 +1,1275 @@
+\section{}
+
+\textbf{Tiempo de lectura:} \{s10-reading-time\}
+
+El \textbf{{}paso de mensajes} es un mecanismo que permite a los
+procesos compartir información y sincronizar sus acciones sin necesidad
+de compartir recursos ---compartir memoria, archivos, etc.---
+
+Esto lo hace especialmente útil en entornos distribuidos, donde los
+procesos a comunicar residen en ordenadores diferentes conectados a una
+red, por lo que tiene muy difícil ---o incluso imposible--- compartir
+memoria u otros recursos para comunicarse. En este caso, el sistema
+operativo es el encargado de codificar los mensajes y enviarlos a través
+de la red para hacerlos llegar a su destinatario. La web ---donde un
+navegador se conecta a un servidor web para obtener contenido--- y el
+resto de servicios de Internet son ejemplos de sistemas de paso de
+mensajes.
+
+El sistema de paso de mensajes debe ser proporcionado por el sistema
+operativo que, a diferencia de cuando se usa memoria compartida, se
+encarga de la sincronización ---ya que no existen riesgos en el envío y
+recepción de mensajes al mismo tiempo--- y de establecer el formato que
+deben tener los datos del mensaje.
+
+En algunas fuentes se sigue haciendo referencia al término
+\textbf{{}IPC} (\emph{Interprocess Communication}) ---o
+\textbf{comunicación entre procesos}--- para identificarlo
+exclusivamente con \textbf{sistemas de paso de mensajes}. Sin embargo,
+la \textbf{memoria compartida} y otras técnicas también sirven para
+«comunicar procesos», por lo que es más adecuado usar el término
+\textbf{IPC} para englobar todas las técnicas conocidas de comunicación
+entre procesos.
+
+Los sistemas de paso de mensaje de cualquier sistema operativo debe
+proporcionar al menos dos llamadas al sistema similares a:
+
+\begin{itemize}
+\item
+  \textbf{send( message )} para mandar mensajes a otro proceso.
+\item
+  \textbf{receive( \&message )} para recibir mensajes de otro proceso y
+  copiarlo en \emph{message}.
+\end{itemize}
+
+Vamos a hablar de funciones de un sistema de paso de mensajes
+hipotético. Meros ejemplos para ilustrar las diferentes alternativas.
+Esto no significa que en los sistemas operativos reales las funciones se
+llamen así y tengan esos mismos argumentos.
+
+Para que estas llamadas puedan enviar y recibir mensajes entre dos
+procesos es necesario que haya un \textbf{enlace de comunicaciones}
+entre ambos. No trataremos aquí la implementación física del enlace
+---que por ejemplo puede ser mediante memoria compartida, un bus
+hardware o una red de ordenadores--- sino de su implementación lógica,
+es decir, las características de la interfaz que usan las aplicaciones
+para comunicarse con sus correspondientes operaciones de envío y
+recepción.
+
+\section{Tamaño del mensaje}\label{_tamauxf1o_del_mensaje}
+
+Los diseñadores del sistema operativo deben escoger entre implementar un
+sistema de paso de mensajes con mensajes de tamaño fijo o mensajes de
+tamaño variable:
+
+\begin{itemize}
+\item
+  \textbf{Mensajes de tamaño fijo}. La implementación del sistema
+  operativo es muy sencilla, pero el uso de la interfaz por parte de las
+  aplicaciones es mucho más compleja.
+
+  Por ejemplo, para comunicar procesos en un mismo ordenador cada enlace
+  puede tener un búfer de tamaño fijo donde se copia el mensaje enviado
+  y de donde se extrae el mensaje al recibirlo. Esto es muy sencillo de
+  implementar en el sistema operativo. Sin embargo, si el desarrollador
+  de la aplicación quiere enviar algo de mayor tamaño que el tamaño del
+  mensaje, debe trocearlo en varios mensajes para enviarlo y
+  reconstruirlo al recibirlo.
+\item
+  \textbf{Mensajes de tamaño variable}. La implementación del sistema
+  operativo es más compleja, ya que ahora tiene que gestionar la memoria
+  para almacenar mensajes de tamaño variable hasta que son recibidos.
+  Sin embargo, la programación de aplicaciones es más simple, puesto que
+  el programador puede mandar mensajes de cualquier tamaño sin ninguna
+  preocupación
+\end{itemize}
+
+\subsection{Comunicación orientada a
+flujos}\label{_comunicaciuxf3n_orientada_a_flujos}
+
+En algunos sistemas con \textbf{mensajes de tamaño variable} no se
+preserva la separación entre mensajes al recibirlos. Es decir, que los
+procesos leen un número arbitrario de bytes, donde puede haber parte de
+un mensaje o varios mensajes al mismo tiempo. Por ejemplo, en esos
+sistemas el transmisor puede mandar tres mensajes de 16000, 3200 y 100
+bytes, pero el receptor leer la secuencia de bytes en bloques de 512
+bytes.
+
+A esto se lo denomina \textbf{comunicación orientada a flujos} o
+\textbf{\emph{(streams)}}. Si usamos este tipo de sistema es importante
+conservar la separación entre los mensajes recibidos, será nuestra
+responsabilidad escoger un formato de mensaje adecuado que permita al
+receptor recuperar dónde comienza y termina un mensaje dentro de la
+secuencia de bytes.
+
+\section{Referenciación}\label{_referenciaciuxf3n}
+
+Los procesos que se quieran comunicar deben tener una forma de señalarse
+el uno al otro. Para ello el diseñador del sistema puede elegir que el
+sistema de paso de mensajes sea con comunicación directa o indirecta.
+
+\subsection{Comunicación directa}\label{_comunicaciuxf3n_directa}
+
+En la \textbf{comunicación directa}{} cada proceso debe nombrar
+explícitamente al proceso destinatario o receptor de la información. Por
+ejemplo, ahora las llamadas al sistema básicas podrían ser así:
+
+\begin{itemize}
+\item
+  \textbf{send( A, message )} para mandar un mensaje al proceso
+  identificado como «A».
+\item
+  \textbf{receive( A, \&message )} para recibir un mensaje del proceso
+  identificado como «A», copiándolo en «\emph{message}».
+\end{itemize}
+
+De hecho el ejemplo anterior corresponde a un caso de
+\textbf{comunicación directa} con \textbf{direccionamiento simétrico}{},
+pero existe una variante de ese mismo esquema denominado
+\textbf{direccionamiento asimétrico}{} donde el receptor puede recibir
+mensajes de cualquier proceso, de forma que al volver de la llamada
+recibe el mensaje y, opcionalmente, la identidad del remitente.
+
+\begin{itemize}
+\item
+  \textbf{send( A, message )} para mandar un mensaje al proceso
+  identificado como «A»
+\item
+  \textbf{receive( \&pid, \&message )} para recibir un mensaje de
+  cualquier proceso, recibiendo en «\emph{message}» una copia del
+  \emph{message} y en «pid» la identidad del remitente.
+\end{itemize}
+
+En resumen:
+
+\begin{itemize}
+\item
+  En el \textbf{direccionamiento simétrico} tanto el proceso que envía
+  como el que recibe tienen que identificar al otro para comunicarse.
+\item
+  En el \textbf{direccionamiento asimétrico} solo el proceso que envía
+  identifica a que recibe, mientras que este último no tiene que nombrar
+  al remitente. Puede que el sistema operativo informe de quién es el
+  remitente del mensaje que se ha recibido o que no se proporcione forma
+  de saberlo.
+\end{itemize}
+
+Un \textbf{enlace de comunicaciones} según este esquema tiene las
+siguientes características:
+
+\begin{itemize}
+\item
+  Un enlace se establece automáticamente entre cada par de procesos que
+  quieren comunicarse. Por tanto, los procesos solo necesitan conocer la
+  identidad de los otros para comunicarse.
+\item
+  Cada enlace se asocia exactamente a dos procesos.
+\item
+  Entre cada par de procesos solo hay un enlace.
+\end{itemize}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C10_ipc/enlace_comunicación_directa.pdf}
+\caption{Comunicación directa.}
+\end{figure}
+
+La principal desventaja de este tipo de comunicación es que si cambia el
+identificador de un proceso hay que actualizar todas las referencias en
+todos los procesos que se comunican con él. En general cualquier técnica
+que requiera que los identificadores de los procesos sean establecidos
+explícitamente en el código de los programas no es deseable, puesto que
+en muchos sistemas los identificadores de los procesos cambian de una
+ejecución a otra. Por lo tanto, lo mejor sería disponer de una solución
+con un nivel adicional de indirección que evite que los procesos usen
+sus identificadores para comunicarse.
+
+En Windows API un hilo puede enviar mensajes a otro hilo usando
+\{win32\_postthreadmessage\}. Como aún no hemos visto el concepto de
+hilo, podemos asumir que es equivalente al de proceso.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{BOOL PostThreadMessage}\OperatorTok{(}
+\NormalTok{    DWORD  idThread}\OperatorTok{,} 
+\NormalTok{    UINT   Msg}\OperatorTok{,} 
+\NormalTok{    WPARAM wParam}\OperatorTok{,} 
+\NormalTok{    LPARAM lParam }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Identificador del hilo.
+\item
+  Un número entero que identifica el mensaje.
+\item
+  Parámetros del mensaje de tipo entero.
+\end{itemize}
+
+Como se puede observar, en las colas de mensajes de Windows API el
+\textbf{tamaño del mensaje es fijo} y con una estructura muy bien
+definida: un identificador del mensaje y dos enteros que sirven de
+parámetros opcionales del mensaje.
+
+Para recibir el mensaje el proceso llama a \{win32\_getmessage\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{BOOL GetMessage}\OperatorTok{(}
+\NormalTok{    LPMSG lpMsg}\OperatorTok{,} 
+\NormalTok{    HWND  hWnd}\OperatorTok{,}
+\NormalTok{    UINT  wMsgFilterMin}\OperatorTok{,}
+\NormalTok{    UINT  wMsgFilterMax}
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Puntero a una estructura \{win32\_msg\} que a la vuelta contendrá el
+  identificador y los parámetros del mensaje recibido, entre otra
+  información.
+\end{itemize}
+
+Como se puede observar, no se indica de qué hilo o proceso se quiere
+recibir el mensaje, por lo que se trata de un caso de
+\textbf{comunicación directa asimétrica}. De hecho, si se quiere conocer
+la identidad del remitente, este tendría que poner su identificador en
+alguno de los parámetros del mensaje.
+
+El sistema de colas de mensajes de Windows API es una pieza fundamental
+del entorno gráfico de Microsoft Windows. Con ese fin, el sistema trae
+un conjunto de mensajes predefinidos, pero podemos definir nuestros
+propios mensajes para comunicar unos hilos o procesos con otros.
+
+\subsection{Comunicación indirecta}\label{_comunicaciuxf3n_indirecta}
+
+En la \textbf{comunicación indirecta}{} los mensajes son enviados a
+\textbf{buzones}{}, \textbf{\emph{{}maillox}} o \textbf{puertos}{} que
+son objetos donde los procesos pueden dejar y recoger mensajes.
+
+\begin{itemize}
+\item
+  \textbf{send( P, message )} para mandar un mensaje al puerto «P»
+\item
+  \textbf{receive( P, \&message )} para recibir un mensaje del puerto
+  «P».
+\end{itemize}
+
+Un \textbf{enlace de comunicaciones} según este esquema tiene las
+siguientes características:
+
+\begin{itemize}
+\item
+  Un enlace se establece entre un par de procesos solo si ambos
+  comparten un mismo puerto, dado que cada enlace corresponde con un
+  puerto.
+\item
+  Un enlace puede estar asociado a más de dos procesos, puesto que
+  múltiples procesos pueden compartir el mismo puerto.
+\item
+  Entre cada par de procesos en comunicación puede haber varios enlaces,
+  cada uno de los cuales corresponde a un puerto.
+\end{itemize}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C10_ipc/enlace_comunicación_indirecta.pdf}
+\caption{Comunicación indirecta.}
+\end{figure}
+
+El estándar POSIX también define un sistema de colas de
+mensajes\hyperref[LinuxManual-mq]{???}, pero es bastante diferente a la
+solución en Windows API.
+
+Para usarlo, lo primero es abrir o crear ---si aún no existe--- la cola
+de mensajes llamando a \{linux\_mq\_open\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mqd\_t mqueue }\OperatorTok{=}\NormalTok{ mq\_open}\OperatorTok{(}
+    \StringTok{"/foo{-}mqueue"}\OperatorTok{,}      
+\NormalTok{    O\_CREAT }\OperatorTok{|}\NormalTok{ O\_RDWR}\OperatorTok{,}   
+    \BaseNTok{0644}\OperatorTok{,}               
+\NormalTok{    NULL}
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Nombre que identifica la cola de mensajes. Como con los archivos, para
+  que varios procesos puedan acceder a la misma cola, deben indicar el
+  mismo nombre.
+\item
+  Valores que indican diferentes opciones a la hora de abrir la cola de
+  mensajes. Por ejemplo, usando \texttt{O\_RDWR} se indica abrir para
+  enviar o recibir y con \texttt{O\_CREAT} se indica que la cola debe
+  crearse si no existe previamente.
+\item
+  Indica los permisos de la cola de mensajes al crearla nueva, de forma
+  similar a los permisos que se aplican a los archivos.
+\end{itemize}
+
+El valor devuelto por \{linux\_mq\_open\} es el descriptor de la cola de
+mensajes. Como otros descriptores, se hereda de padres a hijos al usar
+\{linux\_fork\}.
+
+Este descriptor se utiliza como primer argumento en funciones
+posteriores para indicar sobre qué cola queremos realizar la
+correspondiente operación. Por ejemplo, para enviar un mensaje se
+utiliza \{linux\_mq\_send\} así:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{int}\NormalTok{ mq\_send}\OperatorTok{(}
+\NormalTok{    mqueue}\OperatorTok{,}                 
+    \OperatorTok{(}\DataTypeTok{const} \DataTypeTok{char} \OperatorTok{*)\&}\NormalTok{message}\OperatorTok{,} 
+    \KeywordTok{sizeof}\OperatorTok{(}\NormalTok{message}\OperatorTok{),}        
+    \DecValTok{0}                       
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Descriptor de la cola a la que enviar el mensaje.
+\item
+  Puntero a la dirección de memoria donde está el mensaje.
+\item
+  Tamaño del mensaje en bytes.
+\item
+  Prioridad del mensaje. Los mensajes con mayor prioridad se entregarán
+  antes.
+\end{itemize}
+
+Mientras que para recibir un mensaje se utiliza \{linux\_mq\_receive\}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{unsigned} \DataTypeTok{int}\NormalTok{ msg\_prio}\OperatorTok{;}
+
+\DataTypeTok{int}\NormalTok{ mq\_receive}\OperatorTok{(}
+\NormalTok{    mqueue}\OperatorTok{,}                 
+    \OperatorTok{(}\DataTypeTok{const} \DataTypeTok{char} \OperatorTok{*)\&}\NormalTok{message}\OperatorTok{,} 
+    \KeywordTok{sizeof}\OperatorTok{(}\NormalTok{message}\OperatorTok{),}        
+    \OperatorTok{\&}\NormalTok{msg\_prio               }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Descriptor de la cola de la que recibir el mensaje.
+\item
+  Puntero a la dirección de memoria donde guardar el mensaje al
+  recibirlo.
+\item
+  Tamaño máximo de espacio reservado en \texttt{message} para guardar el
+  mensaje.
+\item
+  Puntero a variable entera donde devolver la prioridad del mensaje
+  recibido.
+\end{itemize}
+
+Como los mensajes no se dirigen directamente a los procesos, sino a
+estas entidades llamadas colas de mensajes, se trata de un caso de
+\textbf{comunicación indirecta}. Además, el \textbf{tamaño de los
+mensajes es variable}, aunque limitado por defecto a 8 KiB si no se
+configura de otra manera.
+
+Si varios procesos intentan recibir de una misma cola de mensajes al
+mismo tiempo, queda en manos del sistema operativo decidir cuál recibirá
+el siguiente mensaje que llegue. Por lo general es el primero en ser
+escogido por el planificador de la CPU para seguir ejecutándose.
+
+\subsubsection{Recepción concurrente}\label{_recepciuxf3n_concurrente}
+
+Este tipo de comunicación da lugar a algunas situaciones que deben ser
+resueltas durante el diseño. Por ejemplo, ¿qué ocurre, por ejemplo, si
+los procesos A, B y C comparten el puerto P1; A manda un mensaje y B y C
+invocan \texttt{receive()} en el puerto P al mismo tiempo?.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C10_ipc/recepción_concurrente.pdf}
+\caption{Problema de la recepción concurrente.}
+\end{figure}
+
+La respuesta correcta dependerá de la elección de los diseñadores del
+sistema:
+
+\begin{itemize}
+\item
+  No permitir que cada enlace de comunicación ---y por tanto cada
+  puerto--- esté asociado a más de dos procesos.
+\item
+  No permitir que más de un proceso puedan ejecutar \texttt{receive()}
+  al mismo tiempo. Por ejemplo, en algunos sistemas solo el proceso que
+  crea el puerto tiene permisos para recibir de él. Los sistemas que
+  optan por esta solución suelen disponer de algún mecanismo para que un
+  proceso pueda transferir el permiso de recibir a otros procesos.
+\item
+  Permitir que el sistema operativo escoja arbitrariamente quién recibe
+  el mensaje si dos o más procesos ejecutan \texttt{receive()} al mismo
+  tiempo. La elección puede ser aleatoria, mediante algún algoritmo, por
+  ejemplo, por turnos o el siguiente proceso en obtener la CPU, a
+  criterio del planificador de la CPU.
+\end{itemize}
+
+\section{Buffering}\label{_buffering}
+
+{} Los mensajes intercambiados por enlace de comunicación se almacenan
+en una cola temporal, a la espera de ser enviados o, tras recibirlos, a
+la espera de que los reclame el proceso.
+
+Básicamente hay tres formas de implementar dicha cola:
+
+\begin{itemize}
+\item
+  Con \textbf{capacidad cero}{} o \textbf{sin buffering} la cola tiene
+  una capacidad máxima de 0 mensajes, por lo que no puede haber ningún
+  mensaje esperando en el enlace. En este caso el proceso transmisor se
+  bloquea en espera hasta que el receptor recibe el mensaje.
+\item
+  Con \textbf{buffering automático}{}, donde existe dos opciones:
+
+  \begin{itemize}
+  \item
+    Con \textbf{capacidad limitada}{} la cola tiene una capacidad máxima
+    de \emph{N} mensajes, por lo que si la cola se llena el proceso
+    transmisor se bloquea a la espera de que haya espacio en la cola.
+    Obviamente, mientras la cola no se llene en transmisor puede seguir
+    metiendo mensajes sin bloquearse.
+  \item
+    Con \textbf{capacidad ilimitada}{} la cola es de longitud
+    potencialmente infinita, lo que permite que el transmisor nunca
+    espere.
+  \end{itemize}
+\end{itemize}
+
+Las colas de longitud infinita son imposibles, puesto que los recursos
+son limitados. En realidad este término hace referencia a colas de
+longitud variable cuyo máximo viene determinado por la memoria principal
+disponible, que suele ser lo suficientemente grande como para que
+podamos considerar que las colas son infinitas.
+
+Las colas de mensajes en sistemas POSIX tienen capacidad limitada. Los
+límites se configuran al crear la cola, a través del último argumento de
+\{linux\_mq\_open\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{struct}\NormalTok{ mq\_attr attr }\OperatorTok{=} \OperatorTok{\{}  
+    \OperatorTok{.}\NormalTok{mq\_maxmsg }\OperatorTok{=} \DecValTok{5}\OperatorTok{,}      
+    \OperatorTok{.}\NormalTok{mq\_msgsize }\OperatorTok{=} \DecValTok{2049}   
+\OperatorTok{\};}
+
+\NormalTok{mqd\_t mqueue }\OperatorTok{=}\NormalTok{ mq\_open}\OperatorTok{(}
+    \StringTok{"/foo{-}queue"}\OperatorTok{,}
+\NormalTok{    O\_CREAT }\OperatorTok{|}\NormalTok{ O\_RDWR}\OperatorTok{,}
+    \BaseNTok{0644}\OperatorTok{,}
+    \OperatorTok{\&}\NormalTok{attr }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Estructura con propiedades para la cola cuando esta se crea nueva.
+\item
+  Una de las propiedades es el número máximo de mensajes en la cola al
+  mismo tiempo.
+\item
+  Otra de las propiedades es el tamaño máximo de cada mensaje.
+\end{itemize}
+
+Estos límites tienen unos valores por defecto por si en el lugar de
+\texttt{attr} en \{linux\_mq\_open\} se indica \texttt{NULL}. El
+estándar POSIX indica que esos valores por defecto dependen de cada
+sistema operativo, por lo que es necesario ir a la documentación para
+desarrolladores de cada sistema para conocer los detalles en cada caso
+concreto.
+
+Por ejemplo, en Linux los valores por defecto son 10 mensajes y 8 KiB
+por mensaje, siendo estos, además, los valores máximos que admiten esas
+propiedades. Estos valores máximos y por defecto se pueden cambiar de
+forma global para todo el sistema, por si tuviéramos interés en valores
+más altos.
+
+\section{Operaciones síncronas y
+asíncronas}\label{_operaciones_suxedncronas_y_asuxedncronas}
+
+La comunicación entre dos procesos tiene lugar por medio de las llamadas
+\texttt{send()} y \texttt{receive()}; de tal forma que generalmente la
+primera se bloquea cuando la cola de transmisión se llena ---en función
+del tipo de \emph{buffering}--- mientras que la segunda lo hace cuando
+la cola de recepción está vacía.
+
+Sin embargo, en lugar de bloquearse, puede que aun proceso le interese
+ejecutar otras tareas en la CPU. A fin de cuentas las comunicaciones son
+bastante lentas, por lo que en caso de bloquearse podría estar dejando
+de aprovechar bastante tiempo de CPU. Incluso puede darse el caso que
+tengan conexión con otros procesos y que quiera aprovechar para intentar
+comunicarse con alguno de ellos.
+
+Por eso existen diferentes opciones de diseño a la hora de implementar
+las llamadas anteriores en función de si se pueden bloquear o no.
+Concretamente, el paso de mensajes puede ser \textbf{{}síncrono} ---con
+bloqueo--- o \textbf{{}asíncrono} ---sin bloqueo---.
+
+\begin{itemize}
+\item
+  \textbf{Cuando el envío es asíncrono}, el proceso transmisor nunca se
+  bloquea. Si se llama a \texttt{send()} cuando la cola de mensajes esté
+  llena, lo más común es que retorne con un código de retorno que
+  indique que el proceso debe volver a intentar el envío más tarde.
+\item
+  \textbf{Cuando el envío es síncrono}, el proceso transmisor se bloquea
+  cuando no queda espacio en la cola de mensajes y hasta que pueda
+  depositar el mensaje en la misma.
+\item
+  \textbf{Cuando la recepción es asíncrona}, el receptor nunca se
+  bloquea. En caso de que la cola de mensajes esté vacía, el sistema
+  operativo puede indicar al proceso que lo intente más tarde a través
+  de un código de retorno o devolviendo un mensaje vacío.
+\item
+  \textbf{Cuando la recepción es con bloqueo}, el receptor se bloquea
+  cuando no hay mensajes en la cola y hasta que llegue alguno.
+\end{itemize}
+
+Algunos sistemas de paso de mensajes son claramente síncronos o
+asíncronos. Mientras que otros permiten activar un modo u otro según las
+necesidades de la aplicación. E incluso los hay que soportan que la
+transmisión y recepción sean síncronas o asíncronas de manera totalmente
+independiente.
+
+Por defecto las colas de mensajes son síncronas, tanto en envío como en
+recepción. Es decir, si al enviar un mensaje la cola está llena, el
+proceso transmisor quedará bloqueado en estado \textbf{esperando} hasta
+que haya un hueco libre para depositar el nuevo mensaje. Si al recibir
+un mensaje la cola está vacía, el receptor quedará bloqueado hasta que
+otro proceso deposite un mensaje.
+
+Sin embargo, si en el argumento \texttt{oflag} de \{linux\_mq\_open\} un
+proceso indica la opción \texttt{O\_NONBLOCK} estas operaciones para ese
+proceso en esa cola serán asíncronas:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mqd\_t mqueue }\OperatorTok{=}\NormalTok{ mq\_open}\OperatorTok{(}
+    \StringTok{"foo{-}mqueue"}\OperatorTok{,}
+\NormalTok{    O\_RDONLY }\OperatorTok{|}\NormalTok{ O\_NONBLOCK}\OperatorTok{,} 
+    \BaseNTok{0644}\OperatorTok{,}
+    \OperatorTok{\&}\NormalTok{attr}
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Abrir la cola de mensajes para solo lectura ---con
+  \texttt{O\_RDONLY}--- y para comunicaciones asíncronas ---con
+  \texttt{O\_NONBLOCK}---.
+\end{itemize}
+
+Eso quiere decir que las funciones \{linux\_mq\_send\} y
+\{linux\_mq\_receive\}, en lugar de bloquear el proceso en estado de
+esperando, devolverán -1 y el valor de \{linux\_errno\} será
+\texttt{EAGAIN}. Así el proceso puede aprovechar el tiempo de CPU del
+que dispone para realizar otras tareas mientras tanto y volver a
+intentarlo más tarde.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{int}\NormalTok{ return\_code }\OperatorTok{=}\NormalTok{ mq\_receive}\OperatorTok{(}\NormalTok{mqueue}\OperatorTok{,} \OperatorTok{\&}\NormalTok{message}\OperatorTok{,} \KeywordTok{sizeof}\OperatorTok{(}\NormalTok{message}\OperatorTok{),} \OperatorTok{\&}\NormalTok{msg\_prio}\OperatorTok{);}
+\ControlFlowTok{if} \OperatorTok{(}\NormalTok{ return\_code }\OperatorTok{\textgreater{}} \DecValTok{0} \OperatorTok{)} 
+\OperatorTok{\{}
+    \CommentTok{// Aquí va código para usar el mensaje recibido...}
+\OperatorTok{\}}
+\ControlFlowTok{else} \ControlFlowTok{if}\OperatorTok{(}\NormalTok{ return\_code }\OperatorTok{\textless{}} \DecValTok{0} \OperatorTok{\&\&}\NormalTok{ errno }\OperatorTok{!=}\NormalTok{ EAGAIN}\OperatorTok{)} 
+\OperatorTok{\{}
+    \CommentTok{// Aquí va código para manejar el error de mq\_receive()...}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Si todo va bien, \{linux\_mq\_receive\} devuelve el tamaño en bytes
+  del mensaje.
+\item
+  Si devuelve -1, es que ha ocurrido un error. Pero solo será un error
+  real si el código de error en \{linux\_errno\} no es \texttt{EAGAIN}.
+  Si es \texttt{EAGAIN}, se pueden ejecutar otras partes del programa y
+  volver a intentar la recepción más adelante.
+\end{itemize}
+
+Si un proceso debe comunicarse mediante varias colas de mensajes, la
+comunicación asíncrona también sirve para intentar recibir y enviar de
+varias colas sin bloquearse en ninguna. Para este caso algunos sistemas
+ofrecen una alternativa más sencilla y eficiente, que veremos en el
+\hyperref[_colas_de_mensajes_posix]{Colas de mensajes POSIX}.
+
+\section{Ejemplos de sistemas de paso de
+mensajes}\label{_ejemplos_de_sistemas_de_paso_de_mensajes}
+
+\subsection{Colas de mensajes POSIX}\label{_colas_de_mensajes_posix}
+
+Como hemos comentado a lo largo de capítulo, las colas de mensajes POSIX
+son un caso de \textbf{comunicación indirecta}, con \textbf{tamaño de
+mensaje variable}, \emph{buffering} con \textbf{capacidad limitad} y que
+soporta operaciones \textbf{asíncronas}.
+
+Las colas de mensajes son útiles para enviar mensajes de pequeño tamaño
+entre procesos que se ejecutan en el mismo sistema. Además tienen la
+posibilidad de asociar a cada mensaje una prioridad, de tal forma que se
+reciban primero los mensajes de prioridad más alta. Su uso es
+relativamente común en sistemas de tiempo real, aunque lo más frecuente
+en los sistemas de propósito general es usar \emph{sockets}.
+
+En \{message\_queue\_hpp\} se puede ver un ejemplo de una clase
+desarrollada en C++ para utilizar colas de mensajes POSIX. En los
+distintos métodos se puede ver cómo se utilizan las funciones de la
+librería del sistema para crear la cola y enviar y recibir mensajes.
+
+En \{mqueue\_server\_cpp\} y \{mqueue\_client\_cpp\} se puede ver un
+ejemplo de cómo se utiliza la clase en \{message\_queue\_hpp\}. El
+primero es un programa que muestra la hora del sistema periódicamente.
+El segundo se puede comunicar con el primero a través de una cola de
+mensajes para controlarlo. En ejemplo es muy sencillo, así que, por el
+momento, lo único que puede hacer \{mqueue\_client\_cpp\} es pedirle a
+\{mqueue\_server\_cpp\} que termine. Aunque no costaría nada añadir
+otras órdenes, como pedir que cambie la hora del sistema o la
+periodicidad con la que la muestra.
+
+En Linux los descriptores de colas de mensajes son descriptores de
+archivo ---como también lo son los descriptores de \emph{sockets},
+tuberías y los de archivos abiertos con \{linux\_open\}, entre otros---.
+Esta particularidad implica que en Linux, mediante las funciones
+\{linux\_select\}, \{linux\_poll\} o \{linux\_epoll\}, se pueden
+monitorizar al mismo tiempo varios descriptores de colas de mensajes,
+para así saber cuándo se puede enviar o recibir por ellas sin que el
+proceso se bloquee.
+
+Este comportamiento es específico de Linux. No está contemplado en el
+estándar POSIX, por lo que otros sistemas POSIX no tienen por qué
+soportarlo. Así que no es portable.
+
+A continuación se puede ver un ejemplo específico con \{linux\_poll\},
+aunque las tres funciones se utilizan empleando un patrón similar:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mqd\_t mqueue1 }\OperatorTok{=}\NormalTok{ mq\_open}\OperatorTok{(} \StringTok{"/foo{-}queue"}\OperatorTok{,} \CommentTok{/* ... */} \OperatorTok{);} 
+\NormalTok{mqd\_t mqueue2 }\OperatorTok{=}\NormalTok{ mq\_open}\OperatorTok{(} \StringTok{"/bar{-}queue"}\OperatorTok{,} \CommentTok{/* ... */} \OperatorTok{);}
+
+\KeywordTok{struct}\NormalTok{ pollfd fds}\OperatorTok{[]} \OperatorTok{=}
+\OperatorTok{\{}
+    \OperatorTok{\{}
+        \OperatorTok{.}\NormalTok{fd }\OperatorTok{=}\NormalTok{ mqueue1}\OperatorTok{,} 
+        \OperatorTok{.}\NormalTok{events }\OperatorTok{=}\NormalTok{ POLLIN}\OperatorTok{,} 
+        \OperatorTok{.}\NormalTok{revents }\OperatorTok{=} \DecValTok{0}
+    \OperatorTok{\},} \OperatorTok{\{}
+        \OperatorTok{.}\NormalTok{fd }\OperatorTok{=}\NormalTok{ mqueue2}\OperatorTok{,} 
+        \OperatorTok{.}\NormalTok{events }\OperatorTok{=}\NormalTok{ POLLIN }\OperatorTok{|}\NormalTok{ POLLOUT}\OperatorTok{,} 
+        \OperatorTok{.}\NormalTok{revents }\OperatorTok{=} \DecValTok{0}
+    \OperatorTok{\}}
+\OperatorTok{\};}
+
+\ControlFlowTok{while} \OperatorTok{(} \OperatorTok{!}\NormalTok{quit\_app }\OperatorTok{)}
+\OperatorTok{\{}
+    \DataTypeTok{int}\NormalTok{ return\_code }\OperatorTok{=}\NormalTok{ poll}\OperatorTok{(}\NormalTok{ fds}\OperatorTok{,} \DecValTok{2}\OperatorTok{,} \OperatorTok{{-}}\DecValTok{1} \OperatorTok{);} 
+    \ControlFlowTok{if} \OperatorTok{(}\NormalTok{return\_code }\OperatorTok{\textgreater{}} \DecValTok{0}\OperatorTok{)} 
+    \OperatorTok{\{}
+        \ControlFlowTok{if} \OperatorTok{(}\NormalTok{fds}\OperatorTok{[}\DecValTok{0}\OperatorTok{].}\NormalTok{revents }\OperatorTok{\&}\NormalTok{ POLLIN}\OperatorTok{)} 
+        \OperatorTok{\{}
+\NormalTok{            mq\_receive}\OperatorTok{(}\NormalTok{ fds}\OperatorTok{[}\DecValTok{0}\OperatorTok{].}\NormalTok{fd}\OperatorTok{,} \CommentTok{/* ... */} \OperatorTok{);}
+
+            \CommentTok{// Aquí va código para usar el mensaje recibido...}
+        \OperatorTok{\}}
+
+        \ControlFlowTok{if} \OperatorTok{(}\NormalTok{fds}\OperatorTok{[}\DecValTok{1}\OperatorTok{].}\NormalTok{revents }\OperatorTok{\&}\NormalTok{ POLLIN}\OperatorTok{)} 
+        \OperatorTok{\{}
+\NormalTok{            mq\_receive}\OperatorTok{(}\NormalTok{ fds}\OperatorTok{[}\DecValTok{1}\OperatorTok{].}\NormalTok{fd}\OperatorTok{,} \CommentTok{/* ... */} \OperatorTok{);}
+
+            \CommentTok{// Aquí va código para usar el mensaje recibido...}
+        \OperatorTok{\}}
+
+        \ControlFlowTok{if} \OperatorTok{(}\NormalTok{fds}\OperatorTok{[}\DecValTok{1}\OperatorTok{].}\NormalTok{revents }\OperatorTok{\&}\NormalTok{ POLLOUT}\OperatorTok{)} 
+        \OperatorTok{\{}
+            \CommentTok{// Aquí va código para preparar el mensaje a enviar...}
+
+\NormalTok{            mq\_send}\OperatorTok{(}\NormalTok{ fds}\OperatorTok{[}\DecValTok{1}\OperatorTok{].}\NormalTok{fd}\OperatorTok{,} \CommentTok{/* ... */} \OperatorTok{);}
+        \OperatorTok{\}}
+    \OperatorTok{\}}
+    \ControlFlowTok{else} \ControlFlowTok{if} \OperatorTok{(}\NormalTok{return\_code }\OperatorTok{\textless{}} \DecValTok{0}\OperatorTok{)} 
+    \OperatorTok{\{}
+        \CommentTok{// Error en poll().}
+        \CommentTok{// Aquí va código para leer errno y manejar el error...}
+
+\NormalTok{        quit\_app }\OperatorTok{=} \KeywordTok{true}\OperatorTok{;}
+    \OperatorTok{\}}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Abrimos o creamos las colas que vamos a utilizar.
+\item
+  Creamos un \emph{array} de la estructura \texttt{pollfd} con un
+  elemento por cola que vamos a monitorizar con \{linux\_poll\}. En cada
+  estructura, en el campo \texttt{fd}, se indica el descriptor de cada
+  una de las colas de mensajes.
+\item
+  Para cada cola hay que utilizar el campo \texttt{events} para indicar
+  qué queremos que monitorice \{linux\_poll\}. \texttt{events} es una
+  máscara de bit donde a cada evento monitorizable le corresponde un
+  bit. Si queremos monitorizar un evento, debemos poner su bit a 1.
+
+  Para eso nos podemos ayudar de macros como \texttt{POLLIN} y
+  \texttt{POLLOUT}. Por ejemplo, para \texttt{mqueue1} se quiere
+  monitorizar cuándo hay mensajes para recibir, por lo que se activa
+  \texttt{POLLIN}. Mientras que para \texttt{mqueue2} se quiere saber
+  tanto cuándo hay mensajes para recibir como cuándo hay un hueco en la
+  cola para enviar sin bloqueos, por lo que se activan \texttt{POLLIN} y
+  \texttt{POLLOUT}.
+\item
+  Iterativamente se llama a \{linux\_poll\} ---mientras no queramos que
+  termine la aplicación--- que pondrá el proceso en estado
+  \textbf{esperando} hasta que ocurra alguno de los eventos que nos
+  interesan. \{linux\_poll\} necesita \texttt{fds} ---el \emph{array} de
+  la estructura \texttt{pollfd} que hemos inicializado previamente--- el
+  número de elementos en el \emph{array} y el tiempo máximo que debe
+  mantener bloqueado el proceso esperando a que ocurra alguno de los
+  eventos. Con un número negativo en este último campo, se indica que
+  queremos que espere indefinidamente.
+\item
+  Si \{linux\_poll\} tiene éxito, devuelve un número positivo que indica
+  en cuántos descriptores se ha detectado un evento.
+\item
+  Si \{linux\_poll\} devuelve un valor negativo, es que ha ocurrido
+  algún error. El motivo del error se puede conocer comprobando el valor
+  de la variable global \{linux\_errno\}.
+\item
+  El campo \texttt{revents} es una máscara de bits similar a
+  \texttt{events}, pero al retornar de \{linux\_poll\} indica qué
+  eventos se han detectado, para cada cola de mensajes en \texttt{fds}.
+
+  Por ejemplo, en ambas colas se comprueba si \texttt{POLLIN} está
+  activo. En caso afirmativo, sabemos que podemos leer un mensaje sin
+  que \{linux\_mq\_receive\} se bloquee. Igualmente, sabemos si
+  \texttt{mqueue2} tiene hueco para enviar un mensaje comprobando si
+  \texttt{POLLOUT} está activo. En caso afirmativo, podemos enviar un
+  mensaje con \{linux\_mq\_send\} sabiendo que no se bloqueará.
+\end{itemize}
+
+\subsection{Señales en sistemas operativos
+POSIX}\label{_seuxf1ales_en_sistemas_operativos_posix}
+
+En los sistemas POSIX, una forma más sencilla de comunicar dos procesos
+del mismo sistema es mediante el envío de una \textbf{{}señal} de uno al
+otro.
+
+Los procesos pueden mandar señales utilizando la llamada al sistema
+\{linux\_kill\}, que solo requiere el identificador del proceso de
+destino y el número que identifica la señal.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{kill}\OperatorTok{(}\NormalTok{pid}\OperatorTok{,}\NormalTok{ SIGTERM}\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+Como se usa el identificador del proceso, estamos hablando de un
+mecanismo de \textbf{comunicación directa}.
+
+El \textbf{tamaño y formato del mensaje es fijo}. Las señales solo
+pueden portar la información de que ha ocurrido un evento, indicado qué
+evento es a través del número que identifica la señal.
+
+Cada señal tiene un efecto particular por defecto ---que por lo general
+es matar al proceso--- en el proceso que las recibe. Sin embargo, cada
+proceso puede declarar un \textbf{manejador de señal}{}. Una función del
+programa que será invocada por el sistema operativo para tratar una
+señal determinada, interrumpiendo lo que esté haciendo el proceso en ese
+momento. En ese sentido las señales en POSIX puede interpretarse como
+una forma de interrupción por software.
+
+Como la ejecución del programa se interrumpe para saltar al
+\textbf{manejador de señal} y luego continuar, hay que tener cuidado con
+el código de los \textbf{manejadores de señal}. Puede causar problemas
+que, por ejemplo, modifiquen el valor de una variable en un punto donde
+el resto del código no espera que puedan ocurrir cambios. Por eso es
+recomendable que el código de los \textbf{manejadores de señal} sea
+\textbf{reentrante} (véase el \hyperref[_funciones_reentrantes]{???}) y
+que solo invoquen otras funciones \textbf{reentrantes} o funciones de la
+librería del sistema marcadas como
+\href{https://man7.org/linux/man-pages/man7/signal-safety.7.html}{seguras
+en señales}.
+
+El \textbf{manejador de señal} se puede configurar usando la llamada al
+sistema \{linux\_signal\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{signal}\OperatorTok{(}
+\NormalTok{    SIGTERM}\OperatorTok{,} 
+    \OperatorTok{\&}\NormalTok{mi\_manejador\_de\_sigterm }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Identificador de la señal a recibir.
+\item
+  Puntero al manejador de señal. Es decir, la del programa que será
+  llamada por el sistema operativo cuando llegue la señal
+  \texttt{SIGTERM}.
+\end{itemize}
+
+El problema de \{linux\_signal\} es que el estándar POSIX permite
+diferencias que hacen que se pueda comportar de forma distinta en
+diferentes sistemas operativos. Por ejemplo, qué ocurre al retornar del
+\textbf{manejador de señal} si cuando llegó la señal el proceso estaba
+ocupado en una llamada al sistema. Como el estándar no especifica nada
+al respecto, los sistemas BSD optaron porque las llamadas al sistema
+continuaran como si nada, mientras que en otros sistemas POSIX las
+llamadas al sistema son interrumpidas como si hubiera ocurrido un error.
+
+Para resolverlo, el estándar recomienda usar \{linux\_sigaction\} en su
+lugar, ya que está descrita de forma más precisa ---evitando este tipo
+de divergencias--- y permite que el programador escoja de entre varias
+opciones el comportamiento que más le convenga:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{struct}\NormalTok{ sigaction act }\OperatorTok{=} \OperatorTok{\{}
+    \OperatorTok{.}\NormalTok{sa\_handler }\OperatorTok{=} \OperatorTok{\&}\NormalTok{mi\_manejador\_de\_sigterm}\OperatorTok{,} 
+    \OperatorTok{.}\NormalTok{sa\_sigaction }\OperatorTok{=}\NormalTok{ NULL}\OperatorTok{,}   
+    \OperatorTok{.}\NormalTok{sa\_mask }\OperatorTok{=} \DecValTok{0}\OperatorTok{,}           
+    \OperatorTok{.}\NormalTok{sa\_flags }\OperatorTok{=}\NormalTok{ SA\_RESTART}\OperatorTok{,} 
+\OperatorTok{\}}
+
+\NormalTok{sigaction}\OperatorTok{(}
+\NormalTok{    SIGTERM}\OperatorTok{,} 
+    \OperatorTok{\&}\NormalTok{act}\OperatorTok{,}    
+\NormalTok{    NULL     }
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Identificador de la señal a recibir.
+\item
+  Puntero a una estructura de tipo \texttt{sigaction} que describe los
+  detalles de como tratar la señal cuando llega al proceso.
+\item
+  Puntero a una estructura de tipo \texttt{sigaction} donde
+  \{linux\_sigaction\} guarda la configuración anterior sobre como
+  tratar la señal indicada.
+\item
+  Puntero al manejador de señal para la señal indicada.
+\item
+  Puntero a un manejador de señal alternativo al de
+  \texttt{sa\_handler}. Este manejador recibe más información sobre la
+  señal cuando es llamado. Para activar es necesario indicar
+  \texttt{SA\_SIGINFO} en el campo \texttt{sa\_flags}.
+\item
+  Máscara de bits de señales a bloquear durante el manejo de la señal.
+  Cada bit de la máscara identifica a una señal. Deben ponerse a 1
+  aquellas señales que queremos que estén bloqueadas ---es decir, que no
+  se puedan recibir--- mientras se ejecuta el manejador de señal porque
+  ha llegado una. Es especialmente útil si se va a usar el mismo
+  manejador para varias señales.
+\item
+  Opciones de configuración. En el ejemplo se usa \texttt{SA\_RESTART},
+  que indica que si la señal llega durante una llamada al sistema, la
+  llamada debe continuar una vez se haya salido del manejador de señal.
+  Como comentamos anteriormente, este es el comportamiento de
+  \{linux\_signal\} en los sistemas BSD. El comportamiento por defecto,
+  sin esta opción, es que la llamada al sistema interrumpida falle con
+  el error \texttt{EINTR} en \{linux\_errno\}.
+\end{itemize}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C10_ipc/orígenes_de_las_señales.pdf}
+\caption{Orígenes más comunes de las
+señales.}\label{fig-oruxedgenes-de-las-seuxf1ales}
+\end{figure}
+
+Las señales fueron diseñadas originalmente como un mecanismo para que el
+sistema operativo notificase a los programas ciertos errores y sucesos
+críticos. Por ejemplo:
+
+\begin{itemize}
+\item
+  La señal \texttt{HUP} o \texttt{SIGHUP} es enviada a cada proceso
+  iniciado desde una sesión de terminal cuando dicha sesión termina ---o
+  cuando se usa la combinación de teclas {CTRL+D}, que tiene el mismo
+  efecto---.
+
+  En el caso de los servicios del sistema ---que, como no son
+  interactivos, no están conectados a ninguna terminal--- esta señal
+  suele usarse para indicarles que deben reiniciarse, volviendo a leer
+  sus archivos de configuración, o para que guarden su estado interno en
+  algún sitio conocido del almacenamiento.
+\item
+  La señal \texttt{INT} o \texttt{SIGINT} es enviada al proceso que está
+  enganchado a la consola cuando el usuario pulsa el carácter de
+  interrupción ---frecuentemente la combinación de teclas {CTRL+C}---.
+\item
+  La señal \texttt{TERM} o \texttt{SIGTERM} es enviada al proceso cuando
+  debe terminar. Por ejemplo, el sistema operativo envía esta señal a
+  todos los procesos cuando se está apagando el sistema.
+\item
+  La señal \texttt{SEGV} o \texttt{SIGSEGV} es enviada a un proceso
+  cuando intenta acceder a una zona de memoria a la que no tiene
+  permiso. Si no se maneja esta señal, el programa termina con el
+  conocido mensaje de \textbf{violación de segmento}.
+\end{itemize}
+
+Obviamente hay muchas más señales. Entre todas, el estándar POSIX
+incluye dos señales ---\texttt{USR1} y \texttt{USR2}--- especialmente
+indicadas para usarlas con el significado que nosotros queramos.
+
+Se puede consultar una lista de las señales del estándar POSIX en
+\href{https://es.wikipedia.org/wiki/Se\%C3\%B1al_(inform\%C3\%A1tica)}{«Señales
+(informática) --- Wikipedia»}. Mientras que la lista completa de señales
+soportadas en Linux se puede consultar en
+\href{https://man7.org/linux/man-pages/man7/signal.7.html}{«signal(7) --- Linux
+Manual»}.
+
+El ejemplo en \{mqueue\_server\_cpp\} y en otros ejemplos de este
+capítulo, utiliza señales para mostrar la hora periódicamente. El código
+dedicado a eso está en \{timeserver\_cpp\} y se comparte entre todos los
+ejemplos. En todos los casos se usa \texttt{SA\_RESTART} porque interesa
+que se maneje la señal de \texttt{SIGARLM} para mostrar la hora, sin
+interrumpir cualquier llamada al sistema en la que puede estar esperando
+el proceso cuando llegue la señal.
+
+En \{signals\_cpp\} hay un programa de ejemplo que muestra cómo manejar
+las señales del sistema y que sirve para ver cómo funcionan. Solo hay
+que ejecutarlo y luego enviarle señales con el comando \texttt{kill}
+desde otra terminal. En este caso si se usa \texttt{SA\_RESTART}, porque
+el programa debe estar esperando la pulsación de una tecla con
+\texttt{getc()} y no nos interesa que deje de hacerlo cuando llegue una
+señal.
+
+\subsection{Tuberías}\label{_tuberuxedas}
+
+Las \textbf{tuberías}{} son un mecanismo de paso de mensajes de
+\textbf{comunicación indirecta}, \textbf{orientada a flujos},
+\textbf{capacidad limitada} y, generalmente, \textbf{comunicación
+síncrona} ---aunque en algunos sistemas operativos también puede
+soportar asíncrona---.
+
+Conceptualmente, cada tubería tiene dos extremos en los que opera
+utilizando la misma interfaz que generalmente empleamos para manipular
+archivos. Es decir, usando funciones como \texttt{read()},
+\texttt{write()} y \texttt{close()}, entre otras. Un extremo permite a
+los procesos en ese extremo escribir en la tubería, mientras el otro
+extremo permite a los procesos leer de la tubería los datos escritos
+desde el otro extremo.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{media/C10_ipc/tuberías.pdf}
+\caption{Esquema del concepto de tubería.}
+\end{figure}
+
+El que cada extremo imite ser un archivo, facilita que se puedan usar en
+muchas de las llamadas al sistema que aceptan un archivo como argumento.
+Los procesos pueden leer o escribir en un archivo sin saber realmente si
+están accediendo a una archivo real o se están comunicando con otro
+proceso mediante una tubería.
+
+Existen dos tipos de tuberías:
+
+\begin{itemize}
+\item
+  Las \textbf{tuberías anónimas}{} que solo existen en el espacio de
+  direcciones del proceso que las crea, de tal forma que debe heredarse
+  de padres a hijos para que otros procesos puedan tener acceso.
+\item
+  Las \textbf{tuberías con nombre}{} son públicas al resto del sistema,
+  por lo que teóricamente cualquier proceso con permisos puede abrir una
+  para comunicarse con otros procesos. Por eso se suele utilizar en
+  aplicaciones cliente-servidor, donde un proceso servidor ofrece algún
+  servicio a otros procesos cliente a través de la tubería.
+\end{itemize}
+
+En los sistemas POSIX las \textbf{tuberías con nombre} se denominan
+\emph{FIFO} y tienen presencia en el sistema de archivos como archivos
+especiales.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\caption{Funciones de la API para manipular tuberías.}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+POSIX API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Windows API
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Crear tubería anónima} & \{linux\_pipe\} &
+\{win32\_createpipe\} \\
+\textbf{Crear tubería con nombre} & \{linux\_mkfifo\} &
+\{win32\_createnamedpipe\} \\
+\textbf{Abrir tubería con nombre} & \{linux\_open\} &
+\{win32\_createfile\} \\
+\textbf{Leer} & \{linux\_read\} & \{win32\_readfile\} \\
+\textbf{Escribir} & \{linux\_write\} & \{win32\_writefile\} \\
+\textbf{Cerrar} & \{linux\_close\} & \{win32\_closehandle\} \\
+\textbf{Destruir tubería con nombre} & \{linux\_unlink\} &
+{{[}Automático{]}} \\
+\end{longtable}
+
+Con \{linux\_fork\} es muy sencillo lanzar otros procesos para que
+ejecuten tareas en paralelo. El proceso hijo tiene acceso a los datos
+del padre por la forma en la que funciona \{linux\_fork\} y gracias a
+las tuberías anónimas puede comunicar los resultados al padre. En
+\{fork\_pipe\_cpp\} se puede observar un ejemplo de esto.
+
+Además, el hecho de que cada extremo se comporte como un archivo ---uno
+en modo solo lectura y el otro en modo solo escritura--- hace posible
+redirigir la E/S estándar del proceso hijo. Es decir, conectar la
+entrada, la salida estándar o la salida de error a una tubería, desde la
+que leer lo que el proceso intenta imprimir por la pantalla de la
+terminal o proporcionarle lo que debe leer, como si fuera desde el
+teclado. En \{fork\_redir\_cpp\} se puede ver un ejemplo de cómo
+ejecutar el comando \texttt{ls} y redirigir su salida al proceso padre
+para contar el número de líneas en lo que el comando quería mostrar por
+pantalla.
+
+Por otro lado, las tuberías con nombre permiten que un proceso se
+comunique con cualquier otro, solo con conocer la ruta de la tubería. En
+\{fifo\_cpp\} tenemos un ejemplo de un programa que muestra la hora del
+sistema de forma periódica, mientras espera órdenes de una tubería que
+sirve de canal de control remoto. El programa en \{fifo\_control\_cpp\}
+puede conectarse a esa tubería y mandar el comando que hace terminar
+\{fifo\_cpp\}.
+
+\subsection{Sockets}\label{_sockets}
+
+Mientras que las tuberías son conceptualmente un enlace de comunicación
+unidireccional que tiene dos extremos, un \textbf{\emph{{}socket}}
+representa un solo extremo en un enlace de comunicación bidireccional.
+Para que una pareja de procesos se pueda comunicar son necesarios dos
+\emph{sockets} ---uno en cada proceso--- de manera que cada uno de ellos
+es el medio por el que el proceso accede al enlace de comunicación.
+
+La API de \emph{sockets} fue creada por la Universidad de Berkeley para
+abstraer el acceso a la familia de protocolos de Internet en el UNIX
+desarrollado por esa misma universidad. Sin embargo, rápidamente se
+convirtió en el estándar de facto para la comunicación en red, por lo
+que todos los sistemas operativos modernos ---incluidos los sistemas
+POSIX y Microsoft Windows--- tienen una implementación de la misma.
+
+Pese a sus orígenes en Internet, los \emph{sockets} se diseñaron para
+ser independientes de la tecnología de red subyacente con la que se
+implementa el enlace de comunicación. En Linux, por ejemplo, se puede
+utilizar como interfaz de programación para utilizar dos decenas de
+familias de protocolos y tecnologías diferentes.
+
+Para crear un \emph{socket} se utiliza la llamada al sistema
+\{linux\_socket\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{int}\NormalTok{ sockfd }\OperatorTok{=}\NormalTok{ socket}\OperatorTok{(} 
+\NormalTok{    AF\_UNIX}\OperatorTok{,}         
+\NormalTok{    SOCK\_DGRAM}\OperatorTok{,}      
+    \DecValTok{0}
+\OperatorTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  En sistemas POSIX la función devuelve un \texttt{int} con el
+  descriptor del socket mientras que en Microsoft Windows devuelve un
+  \texttt{HANDLE}.
+\item
+  En el primer argumento se especifica la familia de protocolos.
+  \texttt{AF\_UNIX} son un tipo de \emph{socket} que solo sirve para
+  comunicar procesos en el mismo sistema, denominado \textbf{socket de
+  dominio UNIX}{}. Otras familias muy comunes son \texttt{AF\_INET}, que
+  corresponde a la familia de protocolos TCP/IP y \texttt{AF\_INET6}
+  para los protocolos IPv6.
+\item
+  En el segundo argumento se especifica el tipo del \emph{socket}. Cada
+  tipo suele corresponde con un protocolo concreto de la familia
+  elegida. Por ejemplo, los \emph{sockets} \texttt{SOCK\_DGRAM} son «no
+  orientados a conexión», no fiables y de longitud máxima fija, así que
+  en la familia \texttt{AF\_INET} estos \emph{sockets} utilizan UDP.
+  Mientras que los \emph{sockets} \texttt{SOCK\_STREAM} son orientados a
+  conexión, fiables, bidireccionales y orientados a flujo, por lo que en
+  la familia \texttt{AF\_INET} utilizan TCP.
+\end{itemize}
+
+Los \textbf{sockets de dominio UNIX} solo entregan los mensajes dentro
+del mismo sistema, así que siempre son confiables, independientemente de
+si son \texttt{SOCK\_DGRAM} o \texttt{SOCK\_STREAM}.
+
+Un \emph{socket} recién creado no tiene un nombre que otro proceso pueda
+usar para identificarlo y comunicarse con él. Si se va a usar este
+\emph{socket} solo para enviar mensajes a otro \emph{socket}, esto es no
+es un problema. Pero para recibir mensajes, el remitente tiene que poder
+identificar al destinatario.
+
+Para asignar un nombre o dirección a un \emph{socket} se utiliza
+\{linux\_bind\}. La dificultad es que cada familia de protocolos tiene
+un formato de direcciones diferente, así que hay que tener cuidado de
+usar el adecuado:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{struct}\NormalTok{ sockaddr\_un addr }\OperatorTok{=} \OperatorTok{\{}
+    \OperatorTok{.}\NormalTok{sun\_family }\OperatorTok{=}\NormalTok{ AF\_UNIX}\OperatorTok{,}        
+    \OperatorTok{.}\NormalTok{sun\_path }\OperatorTok{=} \StringTok{"/tmp/foo{-}socket"} 
+\OperatorTok{\};}
+
+\DataTypeTok{int}\NormalTok{ result\_code }\OperatorTok{=}\NormalTok{ bind}\OperatorTok{(} 
+\NormalTok{    sockfd}\OperatorTok{,} 
+    \OperatorTok{(}\KeywordTok{struct}\NormalTok{ sockaddr}\OperatorTok{*)} \OperatorTok{\&}\NormalTok{addr}\OperatorTok{,} 
+    \KeywordTok{sizeof}\OperatorTok{(}\NormalTok{addr}\OperatorTok{)} 
+\OperatorTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Como en el resto de llamadas al sistema, en caso de error se devuelve
+  un número negativo y \{linux\_errno\} contendrá el código del error.
+\item
+  El descriptor del \emph{socket} al que se le quiere cambiar la
+  dirección.
+\item
+  La nueva dirección del \emph{socket} especificada como una estructura
+  adecuada para la familia del \emph{socket}. En \emph{socket} de tipo
+  \texttt{AF\_UNIX} la estructura debe ser de tipo \texttt{sockaddr\_un}
+  mientras que en los de tipo \texttt{AF\_INET} es del tipo
+  \texttt{sockaddr\_in}.
+\item
+  El tamaño en bytes de la estructura con la nueva dirección.
+\item
+  En la estructura con la dirección, el primer campo siempre es para
+  indicar la familia.
+\item
+  En los \emph{sockets} de dominio UNIX la dirección es una ruta en el
+  sistema de archivos. Para otras familias, las direcciones se indican
+  de otra manera, por lo que es necesario consultar la documentación.
+\end{itemize}
+
+La API de \emph{sockets} incluye muchas otras funciones:
+
+\begin{itemize}
+\item
+  \{linux\_listen\}, para poner \emph{sockets} tipo
+  \texttt{SOCK\_STREAM} a la espera de conexiones.
+\item
+  \{linux\_connect\}, para conectar un \emph{socket} tipo
+  \texttt{SOCK\_STREAM} con otro que esté a la espera de conexiones.
+\item
+  \{linux\_accept\} para que un \emph{socket} tipo \texttt{SOCK\_STREAM}
+  a la espera de conexiones acepte una solicitud de conexión.
+\item
+  \{linux\_shutdown\} para cerrar uno de los sentidos de una conexión.
+\item
+  \{linux\_close\} para destruir un \emph{socket}.
+\item
+  \{linux\_send\}, \{linux\_sendto\} y \{linux\_sendmsg\} para enviar
+  mensajes. \{linux\_send\} solo se puede utilizar con \emph{sockets}
+  conectados. Mientras que \{linux\_sendto\} permiten indicar la
+  dirección del \emph{socket} de destino, por lo que es útil en
+  \emph{sockets} no orientados a conexión \texttt{SOCK\_DGRAM}.
+\item
+  \{linux\_recv\}, \{linux\_recvfrom\} y \{linux\_recvmsg\} para recibir
+  mensajes. \{linux\_recvfrom\} permite obtener la dirección del
+  \emph{socket} del que llegó el mensaje. Por eso es útil en
+  \emph{sockets} no orientados a conexión \texttt{SOCK\_DGRAM}.
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{struct}\NormalTok{ sockaddr\_un addr}\OperatorTok{;}
+\NormalTok{socklen\_t addrlen}\OperatorTok{;}
+
+\DataTypeTok{int}\NormalTok{ result\_code }\OperatorTok{=}\NormalTok{ recvfrom}\OperatorTok{(} 
+\NormalTok{    sockfd}\OperatorTok{,}          
+    \OperatorTok{\&}\NormalTok{message}\OperatorTok{,}        
+    \KeywordTok{sizeof}\OperatorTok{(}\NormalTok{message}\OperatorTok{),} 
+    \DecValTok{0}\OperatorTok{,}               
+    \OperatorTok{(}\KeywordTok{struct}\NormalTok{ sockaddr}\OperatorTok{*)} \OperatorTok{\&}\NormalTok{addr}\OperatorTok{,} 
+    \OperatorTok{\&}\NormalTok{addrlen         }
+\OperatorTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  En caso de éxito devuelve el número de bytes del mensaje recibido. En
+  caso de error, un -1 y \{linux\_errno\} contiene el código del error.
+\item
+  El descriptor del \emph{socket} al que se le quiere cambiar la
+  dirección.
+\item
+  Puntero a la dirección de memoria donde está el mensaje.
+\item
+  Tamaño del mensaje en bytes.
+\item
+  Opciones adicionales de configuración.
+\item
+  Estructura de dirección vacía donde se copiará la dirección del
+  \emph{socket} que remite el mensaje.
+\item
+  Puntero donde la llamada al sistema copiará el tamaño de la estructura
+  copiada en \texttt{addr}.
+\end{itemize}
+
+Las operaciones con \emph{sockets} son síncronas por defecto. Sin
+embargo, es posible configurarlos en modo asíncrono, para que así
+cualquiera de estas funciones falle, retornando -1 y código de error
+\texttt{EAGAIN} o \texttt{EWOULDBLOCK}, antes de poner el proceso en
+estado \textbf{esperando}.
+
+También se pueden utilizar las funciones \{linux\_select\} y
+\{linux\_poll\} para monitorizar varios \emph{sockets} al mismo tiempo,
+de forma similar a como se hace para colas de mensajes POSIX (véase el
+\hyperref[_colas_de_mensajes_posix]{Colas de mensajes POSIX}).
+
+En \{socket\_cpp\} y \{socket\_control\_cpp\} se puede observar un
+ejemplo similar al que usamos con las tuberías y las colas de mensajes,
+pero empleando \emph{sockets} de dominio UNIX para que el programa de
+control pueda enviar comandos al otro programa.
+
+En resumen, los \textbf{\emph{sockets}} son un mecanismo de paso de
+mensajes de \textbf{comunicación indirecta}, que admite tanto
+comunicación \textbf{orientada a flujos} como \textbf{mensajes de tamaño
+variable}, \emph{buffering} de \textbf{capacidad limitada} y tanto
+\textbf{comunicación síncrona} como \textbf{asíncrona}, aunque el
+comportamiento real final de la interfaz depende de la tecnología de red
+utilizada.

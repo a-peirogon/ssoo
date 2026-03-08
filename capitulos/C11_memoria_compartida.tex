@@ -1,0 +1,240 @@
+\section{}
+
+\textbf{Tiempo de lectura:} \{s11-reading-time\}
+
+La \textbf{memoria compartida}{} es una estrategia para comunicar
+procesos donde uno de ellos gana acceso a regiones de la memoria del
+otro; algo que por lo general el sistema operativo siempre intenta
+evitar. Por eso, para que pueda haber memoria compartida es necesario
+que los dos procesos estén de acuerdo en eliminar dicha restricción.
+
+Dos procesos que comparten una región de la memoria pueden intercambiar
+información simplemente leyendo y escribiendo datos en la misma. Sin
+embargo debemos tener en cuenta que:
+
+\begin{itemize}
+\item
+  La estructura de los datos y su localización dentro de la región
+  compartida la determinan los procesos en comunicación y no el sistema
+  operativo, a diferencia de lo que ocurre en los sistemas de paso de
+  mensajes.
+\item
+  Los procesos son responsables de sincronizarse para no escribir y leer
+  en el mismo sitio de la memoria al mismo tiempo, pues esto puede
+  generar inconsistencias (véase el \hyperref[sincronizaciuxf3n]{???}) .
+\end{itemize}
+
+Las principales ventajas de la memoria compartida frente a otros
+mecanismos de comunicación son:
+
+\begin{itemize}
+\item
+  \textbf{Eficiencia}. Puesto que la comunicación tiene lugar a la
+  velocidad de la memoria principal, se trata de un mecanismo
+  tremendamente rápido.
+\item
+  \textbf{Conveniencia}. Puesto que el mecanismo de comunicación solo
+  requiere leer y escribir de la memoria, se trata de un sistema muy
+  sencillo y fácil de utilizar.
+\end{itemize}
+
+Como ocurre con las tuberías (véase el \hyperref[_tuberuxedas]{???}) la
+memoria compartida puede ser anónima o con nombre.
+
+\section{Memoria compartida
+anónima}\label{_memoria_compartida_anuxf3nima}
+
+La \textbf{memoria compartida anónima}{} solo existe para el proceso que
+la crea y para sus procesos hijos, que heredan el acceso. Es por tanto,
+una forma eficiente de comunicar procesos padres e hijos.
+
+En los sistemas POSIX, las funciones y operadores de reserva de memoria
+como \{clang\_malloc\} y \{cpp\_new\}, utilizan internamente la llamada
+al sistema \{linux\_mmap\}. Esta función se puede llamar de la siguiente
+manera para reservar \texttt{length} bytes de memoria.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{void}\OperatorTok{*}\NormalTok{ p }\OperatorTok{=}\NormalTok{ mmap}\OperatorTok{(} 
+\NormalTok{    NULL}\OperatorTok{,}
+\NormalTok{    length}\OperatorTok{,}     
+\NormalTok{    PROT\_READ }\OperatorTok{|}\NormalTok{ PROT\_WRITE}\OperatorTok{,}      
+\NormalTok{    MAP\_ANONYMOUS }\OperatorTok{|}\NormalTok{ MAP\_PRIVATE}\OperatorTok{,} 
+    \OperatorTok{{-}}\DecValTok{1}\OperatorTok{,}
+    \DecValTok{0}
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Si todo va bien, \{linux\_mmap\} devuelve un puntero al primer byte de
+  la memoria reservada.
+\item
+  Cantidad de memoria a reservar en bytes.
+\item
+  Permisos de acceso para la memoria reservada. En este caso, se
+  solicita permitir la lectura y la escritura de la memoria.
+\item
+  \texttt{MAP\_ANONYMOUS} indica que la memoria no está respaldada por
+  ningún archivo, por lo que su contenido inicial será cero. Mientras
+  que \texttt{MAP\_PRIVATE} establece que la región de memoria es
+  privada.
+\end{itemize}
+
+Lo interesante es que si se cambia \texttt{MAP\_PRIVATE} por
+\texttt{MAP\_SHARED} la región de memoria reservada es memoria
+compartida:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{void}\OperatorTok{*}\NormalTok{ p }\OperatorTok{=}\NormalTok{ mmap}\OperatorTok{(}
+\NormalTok{    NULL}\OperatorTok{,}
+\NormalTok{    length}\OperatorTok{,}
+\NormalTok{    PROT\_READ }\OperatorTok{|}\NormalTok{ PROT\_WRITE}\OperatorTok{,}
+\NormalTok{    MAP\_ANONYMOUS }\OperatorTok{|}\NormalTok{ MAP\_SHARED}\OperatorTok{,} 
+    \OperatorTok{{-}}\DecValTok{1}\OperatorTok{,}
+    \DecValTok{0}
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Memoria anónima y compartida.
+\end{itemize}
+
+Es decir, que al crear un hijo con \{linux\_fork\} este tendrá una copia
+de toda la memoria del proceso padre, excepto esta región en particular,
+que será la misma que la del padre. Por lo tanto, escribiendo y leyendo
+en esa región, ambos procesos pueden comunicarse.
+
+En \{anom\_shared\_memory\_cpp\} se puede ver un ejemplo muy simple,
+similar a \{fork\_pipe\_cpp\} pero utilizando memoria compartida para
+comunicar ambos procesos. Como se puede apreciar, la versión que usa
+memoria compartida es bastante más sencilla que la que utiliza tuberías.
+
+En Microsoft Windows se puede hacer algo similar con
+\{win32\_createfilemapping\}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{HANDLE hMapFile }\OperatorTok{=}\NormalTok{ CreateFileMapping}\OperatorTok{(} 
+\NormalTok{    INVALID\_HANDLE\_VALUE}\OperatorTok{,}
+\NormalTok{    NULL}\OperatorTok{,}
+\NormalTok{    PAGE\_READWRITE}\OperatorTok{,} 
+    \DecValTok{0}\OperatorTok{,}
+\NormalTok{    length}\OperatorTok{,}         
+\NormalTok{    NULL}
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Permisos de acceso para la memoria reservada.
+\item
+  Cantidad de memoria a reservar en bytes.
+\item
+  A diferencia de \{linux\_mmap\}, \{win32\_createfilemapping\} crea un
+  objeto de memoria compartida, pero no hace visible esa memoria para
+  nuestro proceso. Para eso hay que llamar a \{win32\_mapviewoffile\}
+  pasándole el manejador \texttt{hMapFile} devuelto por
+  \{win32\_createfilemapping\}.
+\end{itemize}
+
+\section{Memoria compartida con
+nombre}\label{_memoria_compartida_con_nombre}
+
+La \textbf{memoria compartida con nombre}{} es pública para el resto del
+sistema, por lo que teóricamente cualquier proceso con permisos puede
+acceder a ella para comunicarse con otros procesos.
+
+Como ocurre en las tuberías con nombre, los \textbf{objetos de memoria
+compartida con nombre} hay que crearlos antes de comenzar a utilizarlos.
+Para eso los sistemas POSIX ofrecen la función \{linux\_shm\_open\}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{int}\NormalTok{ shmfd }\OperatorTok{=}\NormalTok{ shm\_open}\OperatorTok{(}   
+    \StringTok{"/foo{-}shm"}\OperatorTok{,}         
+\NormalTok{    O\_RDWR }\OperatorTok{|}\NormalTok{ O\_CREAT}\OperatorTok{,}   
+    \BaseNTok{0666}                
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Nombre que identifica al objeto de memoria compartida. Como ocurre con
+  los archivos, varios procesos pueden acceder al mismo objeto indicando
+  el mismo nombre.
+\item
+  Valores que indican diferentes opciones a la hora de abrir el objeto.
+  Por ejemplo, usando \texttt{O\_RDWR} indicamos que se abra para
+  lectura y escritura. Mientras que con \texttt{O\_CREAT} se indica que
+  el objeto debe crearse si no existía previamente.
+\item
+  Indica los permisos del objeto de memoria compartida al crearlo nuevo,
+  de forma similar a los permisos que se aplican a los archivos en el
+  sistema de archivos.
+\end{itemize}
+
+El valor devuelto por \{linux\_shm\_open\} es el descriptor del objeto
+de memoria compartida, que utilizaremos posteriormente con
+\{linux\_mmap\} al reservar una región de la memoria de nuestro proceso
+donde ese objeto de memoria compartida será visible:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{void}\OperatorTok{*}\NormalTok{ p }\OperatorTok{=}\NormalTok{ mmap}\OperatorTok{(}
+\NormalTok{    NULL}\OperatorTok{,}
+\NormalTok{    length}\OperatorTok{,}                 
+\NormalTok{    PROT\_READ }\OperatorTok{|}\NormalTok{ PROT\_WRITE}\OperatorTok{,}
+\NormalTok{    MAP\_SHARED}\OperatorTok{,}             
+\NormalTok{    shmfd}\OperatorTok{,}                  
+    \DecValTok{0}                       
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Al pasar el descriptor del objeto de memoria compartida, ya no se
+  puede indicar \texttt{MAP\_ANONYMOUS}.
+\item
+  Se puede hacer visible para el proceso todo el objeto de memoria
+  compartida o solo una parte. Para esto último se indica el tamaño de
+  la región y el desplazamiento dentro del objeto, que es el último
+  argumento de \{linux\_mmap\}.
+\end{itemize}
+
+Un objeto de memoria compartida recién creado tiene tamaño 0. Para
+redimensionarlo se utiliza \{linux\_ftruncate\}, que lo que necesita es
+el descriptor del objeto y el nuevo tamaño.
+
+En \{shared\_memory\_cpp\} se puede ver el ejemplo de un programa que
+muestra periódicamente la hora del sistema. En este caso controlado por
+\{shared\_memory\_control\_cpp\} mediante memoria compartida.
+
+En Microsoft Windows también se utiliza \{win32\_createfilemapping\}
+para crear el objeto de memoria compartida con nombre. Simplemente hay
+que indicar el nombre en el último argumento de la función.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{HANDLE hMapFile }\OperatorTok{=}\NormalTok{ CreateFileMapping}\OperatorTok{(}
+\NormalTok{    INVALID\_HANDLE\_VALUE}\OperatorTok{,}
+\NormalTok{    NULL}\OperatorTok{,}
+\NormalTok{    PAGE\_READWRITE}\OperatorTok{,}
+    \DecValTok{0}\OperatorTok{,}
+\NormalTok{    length}\OperatorTok{,}
+    \StringTok{"Global}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{FooMemoriaCompartida"} 
+\OperatorTok{);}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\item
+  Nombre del nuevo objeto de memoria compartida.
+\end{itemize}

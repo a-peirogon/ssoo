@@ -1,0 +1,149 @@
+% ── FUENTES (LuaLaTeX) ────────────────────────────────────────────────────────
+\usepackage{fontspec}
+% NO incluir \usepackage{lmodern}: incompatible con fontspec en LuaLaTeX
+
+% ── IDIOMA ────────────────────────────────────────────────────────────────────
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+
+% ── PARCHE CRÍTICO: debe ir DESPUÉS de \usepackage{babel} ────────────────────
+% Babel v25.4 redefinió \@newl@bel usando \csname, que no acepta caracteres
+% Unicode en nombres de etiquetas (\label{fig-planificación}, etc.).
+% Colocarlo ANTES de babel no funciona: babel lo sobreescribe al cargarse.
+\makeatletter
+\def\@newl@bel#1#2#3{%
+  \@ifundefined{#1@#2}%
+    \relax
+    {\gdef\@multiplelabels{%
+      \@latex@warning@no@line{There were multiply-defined labels}}%
+     \@latex@warning{Label `#2' multiply defined}}%
+  \global\@namedef{#1@#2}{#3}%
+}
+\makeatother
+
+% ── TIPOGRAFÍA ────────────────────────────────────────────────────────────────
+\usepackage{microtype}
+\usepackage{setspace}
+\setstretch{1.1}
+
+% ── GEOMETRÍA ─────────────────────────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm, headheight=15pt]{geometry}
+
+% ── COLORES ───────────────────────────────────────────────────────────────────
+\usepackage[dvipsnames,table]{xcolor}
+\definecolor{linkcolor}{RGB}{0,70,160}
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{shadecolor}{RGB}{245,245,245}
+
+% ── GRÁFICOS ──────────────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\graphicspath{
+  {media/C01_definicion/}
+  {media/C02_tipos_de_sistemas/}
+  {media/C03_historia/}
+  {media/C04_componentes/}
+  {media/C05_servicios/}
+  {media/C06_api/}
+  {media/C07_modo_dual/}
+  {media/C08_estructura/}
+  {media/C09_procesos/}
+  {media/C10_ipc/}
+  {media/C11_memoria_compartida/}
+  {media/C12_hilos/}
+  {media/C13_sincronizacion/}
+  {media/C14_planificacion/}
+  {media/C15_memoria_principal/}
+  {media/C16_paginacion/}
+  {media/C17_memoria_virtual/}
+  {media/C18_almacenamiento/}
+  {media/C19_sistema_de_archivos/}
+  {media/C20_implementacion_sistema_de_archivos/}
+  {media/extras/}
+}
+
+% ── TABLAS ────────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{calc}
+\usepackage{etoolbox}
+
+% ── HIPERENLACES ──────────────────────────────────────────────────────────────
+\usepackage[colorlinks=true,
+            linkcolor=linkcolor,
+            urlcolor=linkcolor,
+            citecolor=linkcolor,
+            unicode=true,
+            pdfencoding=auto,
+            psdextra=true]{hyperref}
+
+% ── LISTAS ────────────────────────────────────────────────────────────────────
+\usepackage{enumitem}
+\setlist{noitemsep, topsep=4pt}
+
+% ── MATEMÁTICAS ───────────────────────────────────────────────────────────────
+\usepackage{amsmath, amssymb}
+
+% ── ÍNDICE ────────────────────────────────────────────────────────────────────
+\usepackage{makeidx}
+\makeindex
+
+% ── ENCABEZADOS ───────────────────────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[LO]{\nouppercase{\rightmark}}
+\fancyhead[RE]{\nouppercase{\leftmark}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── BLOQUES DE CÓDIGO ─────────────────────────────────────────────────────────
+\usepackage{fancyvrb}
+\usepackage{framed}
+
+% Shaded: fondo gris. NO poner \small aquí: interfiere con Verbatim dentro
+% de \MakeFramed. El tamaño de fuente va en las opciones de Highlighting.
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+
+% Highlighting: DEBE usarse \DefineVerbatimEnvironment, no \newenvironment.
+% Envolver \begin{Verbatim} en \newenvironment falla al anidar dentro de
+% snugshade porque fancyvrb no inicializa correctamente el modo verbatim,
+% dejando a LaTeX en LR mode al ejecutar \end{Highlighting}.
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{%
+  commandchars=\\\{\},
+  fontsize=\small
+}
+
+% Tokens de resaltado de sintaxis (generados por Pandoc)
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.00,1.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+
+\newcommand{\pandocbounded}[1]{#1}
